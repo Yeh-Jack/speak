@@ -1,0 +1,65 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:16.13-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRE_PASS:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-education}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRE_PASS:-postgres}@db:5432/${POSTGRES_DB:-education}
+      - STORAGE_BASE_PATH=/data
+      - LLM_MODEL_PATH=/data/shared/models
+      - DEFAULT_MODEL=qwen2.5-7b-q4_k_m.gguf
+      - LLM_GPU_LAYERS=${LLM_GPU_LAYERS:--1}
+      - LLM_CONTEXT_SIZE=4096
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+      - JWT_ALGORITHM=HS256
+      - JWT_EXPIRATION=24h
+      - YOUTUBE_DOWNLOAD_QUALITY=720
+      - YOUTUBE_AUDIO_QUALITY=128k
+    volumes:
+      - app_data:/data
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "cd /app &&
+             uv run alembic upgrade head &&
+             uv run uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8080
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  app_data:

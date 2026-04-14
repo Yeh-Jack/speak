@@ -1,0 +1,573 @@
+# English Learning App - Technical Specification
+
+## Project Overview
+
+An AI-powered English education platform that uses LLM as a personalized teacher, supporting reading, listening, and speaking training through video content.
+
+**Target Users**: English learners seeking personalized, self-paced video-based education
+
+**Key Differentiator**: Uses YouTube video content (movies, TV shows, TED talks) with AI-generated study plans and adaptive learning
+
+---
+
+## Tech Stack
+
+| Component | Technology | Version/Notes |
+|-----------|------------|---------------|
+| **Backend** | FastAPI | Python 3.13+ |
+| **Frontend** | React + TypeScript + pnpm | Modern browsers (5 years) |
+| **Database** | PostgreSQL | Multi-tenant support |
+| **Authentication** | JWT | Email/password only |
+| **LLM Engine** | llama-cpp-python | Python bindings, GPU auto-detect, streaming |
+| **Storage** | Local SSD | No NAS support |
+
+---
+
+## LLM Models (User-Selectable)
+
+All models use **Q4_K_M quantization** for optimal performance.
+
+| Model | Parameters | Strengths | Use Case |
+|-------|------------|-----------|----------|
+| **Qwen2.5** | 7B | Best multilingual, excellent reasoning | Primary model |
+| **Gemma 4 E4B-it** | 8B | Google's newest, good quality | Alternative |
+| **Llama 3.2** | 3B | Lightweight, Meta quality | Low resource mode |
+| **Gemma 4 E2B-it** | 5B | Ultra-lightweight | Fallback |
+
+**Note**: Do NOT use Gemma 4's built-in A/V capabilities. Use unified text-only processing for all models.
+
+**GPU Configuration**: llama-cpp-python supports automatic GPU detection with configurable layer offloading:
+- `LLM_GPU_LAYERS=-1`: Auto-detect and offload all layers
+- `LLM_GPU_LAYERS=N`: Offload N specific layers
+- `LLM_GPU_LAYERS=0`: Force CPU-only mode
+
+---
+
+## Core Requirements
+
+### 1. Authentication
+
+- JWT-based authentication
+- Email/password only (no OAuth)
+- Multi-tenant architecture (users have isolated data)
+- User-specific: study plans, progress, vocabulary, exams
+
+**Database Schema**:
+```
+users (id, email, password_hash, created_at, updated_at)
+settings (user_id, preferred_model, theme)
+```
+
+---
+
+### 2. Video Management
+
+#### 2.1 Video Source
+- **YouTube URLs only** - Users submit YouTube video URLs
+- **No local file uploads** - No MP4/WebM upload support
+- **No NAS storage** - Local storage only
+- **Processing**: Immediate async processing (no queue)
+
+#### 2.2 Video Processing Flow (Immediate, Async)
+
+```
+POST /api/videos/youtube
+↓
+1. Download YouTube video (yt-dlp) - async I/O
+2. Segment video (calculate timestamps, 5-min default) - async
+3. Extract/Generate subtitles (yt-dlp or Whisper) - async
+4. Generate study plan (LLM) - async
+5. Return complete video object with all data
+```
+
+**API Behavior**: The endpoint waits for ALL processing to complete before returning. Frontend shows loading state.
+
+#### 2.3 Video Chunking
+
+**Time-Based Only (User-Adjustable, Virtual)**
+- **Duration**: User-adjustable 1-10 minutes, defaults to 5 minutes
+- **Method**: Calculate timestamp segments (no physical splitting)
+- **Storage**: Keep original video only, use timestamps for navigation
+- **Use Case**: General learning, sequential content
+- **Navigation**: Video player seeks to timestamp when changing chunks
+
+#### 2.4 Storage Structure
+```
+/data/
+├── users/
+│   └── {user_id}/
+│       ├── videos/         # Downloaded from YouTube (original file)
+│       ├── transcripts/    # SRT, VTT, JSON
+│       ├── audio/          # Extracted audio for Whisper
+│       ├── courses/        # Course data
+│       └── exams/          # Exam history
+├── shared/
+│   └── models/             # LLM model files
+```
+
+**Note**: No physical chunk files - chunks are virtual with timestamps into the original video.
+
+---
+
+### 3. Subtitle/Transcript Processing
+
+#### 3.1 Priority Order
+1. **YouTube auto-generated subtitles** (extracted via yt-dlp)
+2. **Whisper transcription** (fallback)
+
+#### 3.2 Subtitle Parsing
+- Use `pysubs2` library for SRT, VTT formats
+- Convert to standardized internal format
+
+#### 3.3 Transcription (Whisper Fallback)
+- Use `faster-whisper` (CPU-friendly, fast)
+- Model: `medium` or `large-v3`
+- Output: Timestamped transcript with word-level timestamps
+
+---
+
+### 4. Video Courses
+
+#### 4.1 Course Creation
+- User picks multiple YouTube videos
+- Creates a training course
+- Videos are listed in order (no background processing queue)
+
+#### 4.2 Data Model
+```python
+class VideoCourse:
+    id: UUID
+    user_id: UUID
+    title: str                          # e.g., "English through TED Talks - Week 1"
+    description: str
+    videos: List[VideoCourseItem]
+    current_index: int                  # Current position in course
+    status: pending | active | completed
+    created_at: datetime
+    updated_at: datetime
+
+class VideoCourseItem:
+    id: UUID
+    course_id: UUID
+    video_id: UUID
+    order_index: int                    # Position in course
+    study_plan: JSON                    # Generated by LLM (at video creation time)
+    exam_status: pending | completed | passed | failed
+    created_at: datetime
+```
+
+#### 4.3 Course Processing
+- Videos are processed **immediately** when added (no queue)
+- Each video returns complete with study plan before being added to course
+- Allow reordering of videos in course
+
+---
+
+### 5. Learning Modes
+
+#### 5.1 Reading Mode
+- Display subtitles synchronized with video
+- Vocabulary highlighting (CEFR levels)
+- Hover definitions for difficult words
+- Navigate by sentence or timestamp
+
+#### 5.2 Listening Mode
+- Audio playback with video
+- Adjustable playback speed: 0.5x - 1.5x
+- Loop specific sentences
+- Hide subtitles (blind listening)
+
+#### 5.3 Speaking Mode (Shadowing)
+- **Shadowing**: Play audio → User repeats → Compare
+- **Pronunciation Check**:
+  - User records via Web Speech API
+  - Compare with reference using Whisper
+  - Show similarity score and feedback
+- Adjustable playback speed
+- Sentence-by-sentence practice
+
+#### 5.4 Character Speaking Mode (Impersonation)
+- **Workflow**: Practice speaking as a specific character from the video
+  1. **Show**: Display character's subtitle on screen
+  2. **Play**: Play character's original audio once
+  3. **Rollback**: Auto-rollback to start of sentence (3 seconds back)
+  4. **User Speak**: User records their voice imitating the character
+  5. **Repeat Option**: User can replay original audio before recording again
+- **Comparison**: Compare user's voice with character's original using Whisper
+- **Feedback**: Show pronunciation similarity and intonation tips
+- **Loop Mode**: Option to repeat the workflow for the same sentence
+
+#### 5.5 Resume Functionality
+- Save breakpoint: `timestamp` + `sentence_index`
+- Resume options:
+  - 5 seconds backward from timestamp
+  - 3 sentences backward from current sentence
+- Automatic save every 30 seconds
+
+---
+
+### 6. Study Plan Generation
+
+#### 6.1 LLM-Generated Study Plan
+- Analyze transcript + video metadata
+- Generate structured learning path per video/chunk
+- Include:
+  - Learning objectives
+  - Key vocabulary with definitions
+  - Grammar points
+  - Cultural notes (if applicable)
+  - Practice exercises
+  - Estimated time
+
+#### 6.2 Study Plan Structure
+```json
+{
+  "video_id": "uuid",
+  "title": "Video Title",
+  "duration": "10:00",
+  "chunks": [
+    {
+      "index": 0,
+      "start": "00:00",
+      "end": "05:00",
+      "objectives": ["Learn 10 new vocabulary words"],
+      "vocabulary": [
+        {"word": "innovation", "definition": "...", "cefr": "B2", "context": "..."}
+      ],
+      "grammar": ["Present perfect tense"],
+      "notes": "..."
+    }
+  ],
+  "overall_difficulty": "B1",
+  "estimated_time": "2 hours"
+}
+```
+
+#### 6.3 Vocabulary Extraction
+- Extract difficult words from transcript
+- CEFR level estimation (A1-C2)
+- Context sentences from video
+- Store in user's vocabulary list for review
+
+---
+
+### 7. LLM Processing (Immediate, Async)
+
+#### 7.1 Processing Model
+- **No task queue** - All LLM calls are immediate async operations
+- API endpoints wait for completion before returning
+- Frontend shows loading indicators for long operations
+
+#### 7.2 LLM Operations
+| Operation | Description | When Called |
+|-----------|-------------|-------------|
+| `generate_study_plan` | Generate learning plan for video | During video creation (immediate) |
+| `generate_exam_questions` | Generate exam for video/chunk | When user requests exam (immediate) |
+| `chat_with_teacher` | LLM conversational response | When user sends chat message |
+| `analyze_vocabulary` | Extract vocabulary from transcript | During video creation (immediate) |
+
+#### 7.3 Processing Flow
+```
+User Request → FastAPI → Async I/O Operations → LLM → Return Result → User
+                ↓                              ↓
+          (wait for completion)         (streaming supported)
+```
+
+---
+
+### 8. Exam System
+
+#### 8.1 Adaptive Testing
+- **SM-2 Spaced Repetition Algorithm**
+- Questions repeat based on user performance
+- Difficulty adjusts automatically
+
+#### 8.2 Question Types
+1. **Multiple Choice** - Vocabulary meaning, grammar rules
+2. **Fill-in-the-Blank** - Complete sentences
+3. **Dictation** - Type what you hear
+4. **Speaking** - Pronunciation practice
+5. **Translation** - Translate sentence to native language
+
+#### 8.3 Exam Structure
+- Generated per video/chunk via LLM (immediate when requested)
+- Covers vocabulary, grammar, listening comprehension
+- Minimum 10 questions per chunk
+- Immediate feedback with explanations
+
+#### 8.4 Progress Tracking
+```
+Exam Results → SM-2 Algorithm → Next Review Date → Spaced Repetition Schedule
+```
+
+---
+
+### 9. API Endpoints
+
+#### 9.1 Authentication
+```
+POST /api/auth/register
+POST /api/auth/login
+GET /api/auth/me
+POST /api/auth/refresh
+DELETE /api/auth/logout
+```
+
+#### 9.2 Video Courses
+```
+POST /api/courses                    # Create course
+GET /api/courses                     # List user's courses
+GET /api/courses/{id}                # Get course details
+PUT /api/courses/{id}                # Update course
+DELETE /api/courses/{id}             # Delete course
+POST /api/courses/{id}/videos        # Add video to course (waits for processing)
+PUT /api/courses/{id}/videos/reorder # Reorder videos
+POST /api/courses/{id}/start         # Start learning course
+```
+
+#### 9.3 Videos (YouTube Only) - Immediate Processing
+```
+POST /api/videos/youtube             # Submit YouTube URL → waits for full processing
+GET /api/videos                      # List user's videos
+GET /api/videos/{id}                 # Get video details
+GET /api/videos/{id}/chunks          # Get video chunks (5-min fixed)
+POST /api/videos/{id}/transcript     # Regenerate transcript
+```
+
+**Note**: `POST /api/videos/youtube` is a **long-running synchronous endpoint**. It:
+1. Downloads the video (async)
+2. Chunks it (async)
+3. Generates transcript (async)
+4. Generates study plan via LLM (async)
+5. Returns complete video object only when all done
+
+#### 9.4 Learning
+```
+GET /api/courses/{id}/study-plan     # Get generated study plan
+GET /api/progress/{video_id}         # Get current progress
+PUT /api/progress/{video_id}         # Update progress (resume)
+GET /api/vocabularies                # Get user's vocabulary list
+POST /api/vocabularies/{word}/review # Mark word as reviewed
+```
+
+#### 9.5 Speaking
+```
+POST /api/speaking/record            # Submit audio recording
+GET /api/speaking/compare/{id}       # Get pronunciation comparison
+POST /api/speaking/shadowing         # Submit shadowing practice
+```
+
+#### 9.6 Exam - Immediate Generation
+```
+POST /api/exams/{video_id}/generate  # Generate exam questions (waits for LLM)
+POST /api/exams/{video_id}/submit    # Submit exam answers
+GET /api/exams/{video_id}/results    # Get exam results
+GET /api/exams/history               # Get exam history
+POST /api/exams/review               # Schedule review (SM-2)
+```
+
+#### 9.7 LLM & Models
+```
+GET /api/models                      # List available models
+PUT /api/settings/model              # Switch preferred model
+POST /api/chat                       # Chat with LLM teacher
+POST /api/chat/stream                # Streaming chat response
+```
+
+---
+
+## Implementation Phases
+
+### Phase 1: Foundation (1 week)
+- Project structure setup
+- Docker + docker-compose configuration
+- PostgreSQL schema design
+- Basic FastAPI structure
+- JWT authentication (email/password)
+
+### Phase 2: Video Pipeline (1 week)
+- YouTube download integration (yt-dlp)
+- FFmpeg chunking (5 min fixed)
+- **Immediate async processing** (no queue)
+- Local storage configuration
+
+### Phase 3: Transcription (1 week)
+- YouTube subtitle extraction (yt-dlp)
+- Whisper integration (faster-whisper)
+- Transcript storage and retrieval
+
+### Phase 4: LLM Integration (1 week)
+- llama.cpp Python bindings setup
+- OpenAI-compatible API wrapper
+- Model switching functionality
+- Study plan generation endpoint
+- Chat endpoint with streaming
+
+### Phase 5: Learning Features (1 week)
+- Video player with subtitle sync
+- Study plan display
+- Vocabulary extraction and storage
+- CEFR level estimation
+- Shadowing mode
+
+### Phase 6: Speaking Practice (1 week)
+- Web Speech API integration
+- Audio recording and upload
+- Pronunciation comparison (Whisper)
+- Shadowing mode with adjustable speed
+- Feedback generation
+
+### Phase 7: Exam System (1 week)
+- SM-2 spaced repetition algorithm
+- Question generation (LLM)
+- Multiple question types UI
+- Exam submission and scoring
+- Review scheduling
+
+### Phase 8: Polish & Testing (1 week)
+- UI/UX improvements
+- Error handling
+- Performance optimization
+- End-to-end testing
+- Documentation
+
+**Total Estimated Duration: 8 weeks**
+
+---
+
+## Technical Constraints
+
+### Video Constraints
+- **YouTube URLs only** - No local file uploads
+- Download as WebM using yt-dlp
+- No video format conversion (only chunking)
+- User-adjustable 1-10 minute chunks, default 5 minutes
+
+### LLM Constraints
+- Use llama-cpp-python (Python bindings, no separate container)
+- OpenAI-compatible API via Python bindings
+- Q4_K_M quantization (GGUF format)
+- Under 10B parameters for low-end support
+- No A/V processing from Gemma 4 (unified text approach)
+- GPU auto-detection with CPU fallback
+- Streaming output supported
+
+### Storage Constraints
+- Local storage only (no NAS)
+- Unlimited storage per user
+- Videos downloaded from YouTube stored locally
+
+### Performance Constraints
+- Single concurrent user per deployment (for now)
+- **No background queues** - All processing is immediate async
+- Chunk-based LLM processing (no timeout limits)
+- API endpoints wait for completion (show loading UI)
+
+---
+
+## Success Criteria
+
+### Functional Requirements
+- [ ] Users can submit YouTube URLs
+- [ ] System processes videos immediately (download → chunk → transcribe → study plan)
+- [ ] Videos chunked into user-adjustable 1-10 minute segments (default 5 min)
+- [ ] Subtitles extracted from YouTube or Whisper fallback
+- [ ] Users can create courses with multiple videos
+- [ ] LLM generates study plans immediately during video creation
+- [ ] Resume functionality (5 sec or 3 sentences back)
+- [ ] Reading, listening, and speaking modes functional
+- [ ] Exam system with SM-2 algorithm working
+- [ ] Model switching between Qwen2.5, Gemma 4, Llama 3.2
+
+### Non-Functional Requirements
+- [ ] Single concurrent user support
+- [ ] Video player works in modern browsers (5 years)
+- [ ] LLM responses under 30 seconds (no timeout)
+- [ ] All API operations use async I/O
+- [ ] JWT authentication working (email/password)
+- [ ] Frontend loading states for long operations
+
+---
+
+## Future Enhancements (Out of Scope)
+
+- Real-time collaborative learning
+- Mobile app (React Native)
+- Offline mode
+- AI-powered pronunciation scoring (beyond Whisper)
+- Integration with language learning APIs (e.g., Forvo for pronunciation)
+- Social features (study groups, leaderboards)
+- Multiple language support (teach other languages, not just English)
+- Auto-detection of video difficulty level
+- Integration with external dictionary APIs
+- OAuth authentication (Google, GitHub)
+- Character-based video chunking
+- Local file uploads (MP4/WebM)
+- NAS storage support
+- Task/job queue system
+
+---
+
+## Document History
+
+| Date | Version | Author | Changes |
+|------|---------|--------|---------|
+| 2025-04-08 | 1.0 | AI Assistant | Initial specification |
+| 2025-04-10 | 2.0 | AI Assistant | Simplified: YouTube-only, no OAuth, fixed chunks |
+| 2025-04-10 | 3.0 | AI Assistant | Removed job queue: all processing immediate async |
+
+---
+
+## Appendix
+
+### A. FFmpeg Commands
+
+```bash
+# Split video into 5-min chunks (fixed)
+ffmpeg -i input.mp4 -c copy -map 0 -segment_time 300 -f segment chunk_%03d.mp4
+
+# Extract audio for Whisper
+ffmpeg -i input.mp4 -vn -acodec pcm_s16le -ar 16000 audio.wav
+```
+
+### B. Docker Compose Services
+
+```yaml
+services:
+  backend: FastAPI + Python 3.13+ + llama-cpp-python
+  frontend: React + TypeScript
+  db: PostgreSQL 16
+  # Note: No Redis, no Celery, no task queue
+```
+
+**Note**: llama-cpp-python is integrated into the backend container, no separate LLM service needed.
+
+### C. Environment Variables
+
+```bash
+# Database
+DATABASE_URL=postgresql://user:pass@db:5432/english_learning
+
+# Storage
+STORAGE_BASE_PATH=/data
+
+# LLM (llama-cpp-python)
+LLM_MODEL_PATH=/data/shared/models
+DEFAULT_MODEL=qwen2.5-7b-q4_k_m.gguf
+LLM_GPU_LAYERS=-1                    # -1=auto, 0=CPU only, N=specific layers
+LLM_CONTEXT_SIZE=4096              # Model context window
+LLM_THREADS=4                        # CPU threads for inference
+
+# JWT
+JWT_SECRET=xxx
+JWT_ALGORITHM=HS256
+JWT_EXPIRATION=24h
+
+# YouTube Download
+YOUTUBE_DOWNLOAD_QUALITY=720         # 360, 480, 720, 1080
+YOUTUBE_AUDIO_QUALITY=128k             # Audio quality for extraction
+```
+
+---
+
+**End of Specification**

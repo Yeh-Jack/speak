@@ -1,0 +1,446 @@
+# ============================================================================
+# English Learning App - Git Ignore
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Python / FastAPI
+# ----------------------------------------------------------------------------
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
+# pdm
+.pdm.toml
+
+# PEP 582
+__pypackages__/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# pyright
+pyrightconfig.json
+
+# ----------------------------------------------------------------------------
+# Node.js / React / TypeScript / pnpm
+# ----------------------------------------------------------------------------
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Package managers
+# pnpm
+.pnpm-store/
+pnpm-lock.yaml
+
+# npm
+package-lock.json
+
+# yarn
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.yarn-integrity
+yarn.lock
+.yarnrc.yml
+
+# Testing
+coverage/
+*.lcov
+
+# Production builds
+build/
+dist/
+out/
+.next/
+
+# Vite
+*.local
+
+# TypeScript
+*.tsbuildinfo
+
+# ESLint
+.eslintcache
+
+# Prettier
+.prettiercache
+
+# ----------------------------------------------------------------------------
+# Database
+# ----------------------------------------------------------------------------
+# PostgreSQL
+*.pgsql
+*.dump
+*.sql.gz
+
+# SQLite (if used for testing)
+*.sqlite
+*.sqlite3
+
+# Alembic - keep migrations, ignore local
+alembic.ini
+
+# ----------------------------------------------------------------------------
+# Redis
+# ----------------------------------------------------------------------------
+*.rdb
+*.aof
+dump.rdb
+appendonly.aof
+
+# ----------------------------------------------------------------------------
+# Docker
+# ----------------------------------------------------------------------------
+.dockerignore
+Dockerfile.*
+!.dockerignore
+!Dockerfile
+!docker-compose.yml
+!docker-compose.yaml
+
+# Docker volumes
+docker-volumes/
+
+# ----------------------------------------------------------------------------
+# FFmpeg / Video / Audio
+# ----------------------------------------------------------------------------
+# Video files (user uploads)
+*.mp4
+*.webm
+*.avi
+*.mov
+*.mkv
+*.flv
+
+# Audio files (extracted/transcoded)
+*.wav
+*.mp3
+*.aac
+*.ogg
+*.flac
+*.m4a
+
+# Subtitle files (user uploads, except samples)
+*.srt
+*.vtt
+*.ass
+*.ssa
+*.sub
+
+# Chunks
+chunk_*
+*.chunk
+
+# Thumbnails
+*.thumb
+*.thumbnail
+
+# ----------------------------------------------------------------------------
+# LLM Models
+# ----------------------------------------------------------------------------
+# Model files (large binaries)
+*.gguf
+*.bin
+*.safetensors
+models/
+*.onnx
+*.pt
+*.pth
+*.ckpt
+
+# LLM cache
+.cache/
+llm-cache/
+
+# ----------------------------------------------------------------------------
+# Storage / Data Directories
+# ----------------------------------------------------------------------------
+# User data (videos, transcripts, etc.)
+/data/
+/storage/
+/uploads/
+/temp/
+/processed/
+
+# Celery results
+celery-results/
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# ----------------------------------------------------------------------------
+# IDE / Editors
+# ----------------------------------------------------------------------------
+# VS Code
+.vscode/
+*.code-workspace
+.history/
+
+# IntelliJ / PyCharm / WebStorm
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+.#*
+
+# Nano
+*.save
+
+# ----------------------------------------------------------------------------
+# Operating System
+# ----------------------------------------------------------------------------
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ----------------------------------------------------------------------------
+# Security / Secrets
+# ----------------------------------------------------------------------------
+# Certificates
+*.pem
+*.key
+*.crt
+*.csr
+*.der
+*.p12
+*.pfx
+
+# Secrets (never commit these!)
+secrets/
+*.secret
+secrets.yaml
+secrets.yml
+secrets.json
+
+# SSH
+.ssh/
+
+# ----------------------------------------------------------------------------
+# Project Specific
+# ----------------------------------------------------------------------------
+# Local configuration overrides
+config.local.yaml
+config.local.yml
+config.local.json
+config.local.toml
+
+# Temporary files
+tmp/
+tmp.*/
+
+# Backup files
+*.bak
+*.backup
+*.orig
+*.save
+
+# ----------------------------------------------------------------------------
+# Git
+# ----------------------------------------------------------------------------
+*.orig
+
+# ----------------------------------------------------------------------------
+# Miscellaneous
+# ----------------------------------------------------------------------------
+# Lock files
+*.lock
+!poetry.lock
+
+# Compressed files
+*.zip
+*.tar
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.7z
+*.rar
+
+# Documentation builds
+docs/_build/
+site/
+
+# Storybook
+storybook-static/
+
+# Test screenshots
+cypress/screenshots/
+cypress/videos/
+cypress/downloads/
+
+# Playwright
+playwright-report/
+test-results/

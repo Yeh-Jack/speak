@@ -1,0 +1,96 @@
+"""Video and VideoChunk schemas."""
+
+import uuid
+from datetime import datetime
+
+from pydantic import BaseModel, Field, ConfigDict, HttpUrl
+
+
+class VideoChunkBase(BaseModel):
+    """Base video chunk schema."""
+
+    chunk_index: int
+    start_time: float
+    end_time: float
+    duration: float
+
+
+class VideoChunkCreate(VideoChunkBase):
+    """Schema for creating a video chunk."""
+
+    pass
+
+
+class VideoChunkUpdate(BaseModel):
+    """Schema for updating a video chunk."""
+
+    transcript: list[dict] | None = None
+    status: str | None = None
+
+
+class VideoChunk(VideoChunkBase):
+    """Video chunk response schema."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    video_id: uuid.UUID
+    transcript: list[dict] | None = None
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class VideoBase(BaseModel):
+    """Base video schema."""
+
+    title: str = Field(..., max_length=500)
+    description: str | None = None
+    youtube_url: str
+    chunk_duration: float = Field(default=300.0, ge=60, le=600)
+
+
+class VideoCreate(BaseModel):
+    """Schema for creating a video from YouTube URL."""
+
+    youtube_url: str = Field(..., min_length=10)
+    chunk_duration: float = Field(default=300.0, ge=60, le=600)
+
+
+class VideoUpdate(BaseModel):
+    """Schema for updating a video."""
+
+    title: str | None = Field(None, max_length=500)
+    description: str | None = None
+    status: str | None = None
+
+
+class Video(VideoBase):
+    """Video response schema."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    user_id: uuid.UUID
+    source_type: str
+    file_path: str | None
+    duration: float
+    status: str
+    chunks: list[VideoChunk] = []
+    created_at: datetime
+    updated_at: datetime
+
+
+class VideoInDB(Video):
+    """Video schema with internal fields."""
+
+    pass
+
+
+class VideoResponse(BaseModel):
+    """Complete video response with all data."""
+
+    video: Video
+    chunks: list[VideoChunk]
+    transcript: dict | None = None
+    study_plan: dict | None = None
