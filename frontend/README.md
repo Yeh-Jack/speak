@@ -1,6 +1,6 @@
 # English Learning Frontend
 
-React + TypeScript + Vite frontend for the AI-powered English education platform.
+Vue 3.5 + TypeScript + Vite frontend for the AI-powered English education platform.
 
 ## Prerequisites
 
@@ -38,18 +38,37 @@ The frontend Docker image uses Node.js 22 (see Dockerfile).
 
 ```
 src/
-├── components/    # Reusable components
-│   ├── common/     # Button, Input, Modal, etc.
-│   ├── layout/   # Header, Sidebar, Footer
-│   ├── video/    # VideoPlayer, SubtitleTrack
-│   ├── learning/ # VocabularyCard, StudyPlanView
-│   ├── speaking/ # AudioRecorder, PronunciationView
-│   └── exam/     # QuestionView, ExamTimer
-├── pages/        # Page components
-├── hooks/        # Custom React hooks
-├── services/     # API services
-├── stores/       # Zustand state management
-├── types/        # TypeScript types
-├── utils/        # Utility functions
-└── constants/    # Constants
+├── components/          # Vue components
+│   ├── common/           # Button, Input, Modal, etc.
+│   ├── layout/          # Header, Sidebar, Footer
+│   ├── video/           # VideoPlayer, SubtitleTrack
+│   ├── learning/        # VocabularyCard, StudyPlanView
+│   ├── speaking/        # AudioRecorder, PronunciationView
+│   └── exam/            # QuestionView, ExamTimer
+├── views/               # Page components (Vue views)
+├── composables/         # Vue composables (replacing React hooks)
+├── services/            # API services
+├── stores/              # Pinia stores
+├── types/               # TypeScript types
+├── utils/               # Utility functions
+├── router/              # Vue Router configuration
+└── App.vue              # Root component
 ```
+
+## Key Differences from React
+
+- **Components**: `.vue` files with `<template>`, `<script setup>`, `<style>`
+- **State Management**: Pinia instead of Zustand/Redux
+- **Data Fetching**: Vue Query via `@tanstack/vue-query` or VueUse `useFetch`
+- **Router**: Vue Router instead of React Router
+- **Composables**: Vue composables instead of React hooks
+
+## Vue 3.5 Features Used
+
+- `<script setup>` syntax
+- Composition API
+- Reactive refs with `.value`
+- Computed properties
+- Watch and watchEffect
+- Lifecycle hooks (onMounted, etc.)
+- DefineProps and DefineEmits macros

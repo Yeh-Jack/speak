@@ -707,7 +707,7 @@ class YouTubeDownloadService:
 │       │   ├── time_based/      # Default chunks
 │       │   └── character_based/ # Character-specific chunks
 │       │       └── {speaker_id}/
-│       ├── transcripts/         # SRT, VTT, JSON
+│ ├── transcripts/ # JSON (YouTube subtitles or Whisper output)
 │       ├── audio/               # Extracted audio
 │       ├── speakers/            # Speaker profiles
 │       ├── courses/             # Course data

@@ -1,29 +1,12 @@
 version: "3.8"
 
 services:
-  db:
-    image: postgres:16.13-bookworm
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRE_PASS:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-education}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     environment:
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRE_PASS:-postgres}@db:5432/${POSTGRES_DB:-education}
+      - DATABASE_URL=sqlite+aiosqlite:///data/learning.db
       - STORAGE_BASE_PATH=/data
       - LLM_MODEL_PATH=/data/shared/models
       - DEFAULT_MODEL=qwen2.5-7b-q4_k_m.gguf
@@ -38,13 +21,11 @@ services:
       - app_data:/data
     ports:
       - "8080:8080"
-    depends_on:
-      db:
-        condition: service_healthy
     command: >
       sh -c "cd /app &&
-             uv run alembic upgrade head &&
-             uv run uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload"
+      mkdir -p /data &&
+      uv run alembic upgrade head &&
+      uv run uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload"
 
   frontend:
     build:
@@ -61,5 +42,4 @@ services:
       - backend
 
 volumes:
-  postgres_data:
   app_data:

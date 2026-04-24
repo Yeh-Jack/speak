@@ -3,7 +3,6 @@ FROM python:3.13-slim
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
-    libpq-dev \
     ffmpeg \
     curl \
     && rm -rf /var/lib/apt/lists/*
@@ -15,6 +14,9 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 # Set working directory
 WORKDIR /app
 
+# Create data directory for SQLite and other storage
+RUN mkdir -p /data/shared/models /data/users
+
 # Copy dependency files
 COPY pyproject.toml uv.lock ./
 
@@ -24,6 +26,7 @@ RUN uv sync
 # Copy application code
 COPY app/ ./app/
 COPY alembic/ ./alembic/
+COPY scripts/ ./scripts/
 COPY alembic.ini ./
 
 # Expose port

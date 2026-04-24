@@ -207,6 +207,9 @@ out/
 # SQLite (if used for testing)
 *.sqlite
 *.sqlite3
+*.db
+*.db-shm
+*.db-wal
 
 # Alembic - keep migrations, ignore local
 alembic.ini

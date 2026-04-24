@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import DateTime, String, func
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -16,7 +15,7 @@ class Base(AsyncAttrs, DeclarativeBase):
     __abstract__ = True
 
     type_annotation_map = {
-        uuid.UUID: UUID(as_uuid=True),
+        uuid.UUID: String(36),  # SQLite doesn't have native UUID, use String
     }
 
     def dict(self) -> dict[str, Any]:

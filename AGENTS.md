@@ -2,29 +2,29 @@
 
 ## Project Overview
 
-An AI-powered English education platform using LLM as a personalized teacher. Users provide YouTube URLs (movies, TV shows, TED talks) and the system generates personalized study plans, vocabulary lists, and adaptive exams.
+An AI-powered English education platform using LLM as a personalized teacher. Users provide YouTube URLs (movies, TV shows, TED talks) and the system generates personalized study plans and vocabulary lists. **Single-user application** - no authentication required.
 
 ## Tech Stack
 
 | Component | Technology |
 |-----------|------------|
 | Backend | FastAPI + Python 3.13+ + uv |
-| Frontend | React + TypeScript + Vite |
-| Database | PostgreSQL 16 |
-| LLM | llama-cpp-python (Qwen2.5, Gemma 4, Llama 3.2) |
+| Frontend | Vue 3.5 + TypeScript + Vite |
+| Database | SQLite3 (learning.db) |
+| LLM | llama-cpp-python (Qwen3.5-2B-Q4_K_M) |
 | Video | FFmpeg + yt-dlp |
 | Transcription | faster-whisper |
 
 ## Architecture
 
 ```
-Frontend (React)
-↓ REST API
+Frontend (Vue 3.5 + TypeScript)
+  ↓ REST API
 Backend (FastAPI) - Async I/O operations
-↓
-Services: Auth | Video | LLM | Study | Speaking | Exam
-↓
-PostgreSQL | llama-cpp-python (in-backend)
+  ↓
+Services: Video | LLM | Study | Speaking
+  ↓
+SQLite3 | llama-cpp-python (in-backend)
 ```
 
 **No external queue services** - All operations use async/await with immediate processing. API calls wait for completion and return results directly.
@@ -36,7 +36,7 @@ PostgreSQL | llama-cpp-python (in-backend)
 ├── backend/                 # FastAPI application
 │   ├── app/
 │   │   ├── api/            # API endpoints
-│   │   ├── core/           # Security, config, logging
+│   │   ├── core/           # Config, logging
 │   │   ├── db/             # Database models
 │   │   ├── models/         # SQLAlchemy models
 │   │   ├── schemas/        # Pydantic schemas
@@ -44,13 +44,14 @@ PostgreSQL | llama-cpp-python (in-backend)
 │   │   └── main.py         # FastAPI entry
 │   ├── alembic/            # Database migrations
 │   └── tests/
-├── frontend/               # React application
+├── frontend/               # Vue 3.5 application
 │   ├── src/
 │   │   ├── components/     # Reusable components
-│   │   ├── pages/          # Page components
-│   │   ├── hooks/          # Custom React hooks
+│   │   ├── views/          # Page components (Vue views)
+│   │   ├── composables/    # Vue composables
 │   │   ├── services/       # API services
-│   │   └── stores/         # State management
+│   │   ├── stores/         # Pinia state management
+│   │   └── router/         # Vue Router configuration
 │   └── tests/
 ├── .agents/
 │   └── skills/             # Agent skills (see below)
@@ -63,10 +64,9 @@ PostgreSQL | llama-cpp-python (in-backend)
 Located in `.agents/skills/`:
 
 1. **fastapi-skill** - FastAPI patterns, Pydantic, SQLAlchemy
-2. **video-processing-skill** - FFmpeg, yt-dlp, time-based video chunking (5-min fixed)
+2. **video-processing-skill** - FFmpeg, yt-dlp, time-based video chunking with sentence snap
 3. **transcription-skill** - Whisper, pysubs2
 4. **llm-task-skill** - llama-cpp-python, GPU config, streaming
-5. **exam-system-skill** - SM-2 algorithm, adaptive testing
 
 ## Key Design Patterns
 
@@ -74,14 +74,15 @@ Located in `.agents/skills/`:
 
 1. **Repository Pattern** - Abstract DB operations
 2. **Service Layer** - Business logic separation (async)
-3. **Factory Pattern** - LLM provider switching
-4. **Async I/O** - All I/O operations use async/await
+3. **Async I/O** - All I/O operations use async/await
+4. **No Authentication** - Single user, no auth required
 
 ### Frontend
 
-1. **Custom Hooks** - Data fetching and state
+1. **Vue Composables** - Data fetching and state
 2. **Service Layer** - API client abstraction
-3. **Component Composition** - Reusable UI components
+3. **Component Composition** - Reusable Vue components
+4. **Pinia Stores** - State management
 
 ## Coding Standards
 
@@ -94,37 +95,36 @@ Located in `.agents/skills/`:
 
 ### TypeScript
 - Strict type checking
-- Functional components
-- Custom hooks for logic
+- Vue 3.5 Composition API with `<script setup>`
+- Composables for logic
 
 ## Task Priorities
 
-1. **Phase 1**: Foundation (Docker, DB, Auth - simple email/password)
+1. **Phase 1**: Foundation (Docker, DB, Single LLM setup)
 2. **Phase 2**: Video Pipeline (YouTube download → chunk → transcribe in one async flow)
-3. **Phase 3**: LLM Integration
-4. **Phase 4**: Learning Features
+3. **Phase 3**: LLM Integration (Qwen3.5-2B fixed model)
+4. **Phase 4**: Learning Features (Study plans, vocabulary)
 5. **Phase 5**: Speaking Practice
-6. **Phase 6**: Exam System
-7. **Phase 7**: Polish & Testing
+6. **Phase 6**: Polish & Testing
 
 **No separate queue/course phase** - Video processing happens immediately when URL submitted.
 
 ## LLM Configuration
 
-- **Models**: Qwen2.5 7B, Gemma 4 E4B-it 8B, Llama 3.2 3B, Gemma 4 E2B-it 5B
+- **Fixed Model**: Qwen3.5-2B-Q4_K_M.gguf
 - **Quantization**: Q4_K_M (GGUF format)
 - **Framework**: llama-cpp-python (Python bindings, no separate container)
-- **GPU Support**: NVIDIA and AMD GPU detection and auto-configuration
+- **GPU Support**: NVIDIA GPU detection and auto-configuration
 - **NVIDIA**: GPUtil + CUDA backend
-- **AMD**: pyamdgpuinfo/rocm-smi + ROCm backend
 - **GPU Configuration**:
   - `LLM_GPU_LAYERS=-1`: Auto-detect based on available VRAM
   - `LLM_GPU_LAYERS=N`: Offload N specific layers
   - `LLM_GPU_LAYERS=0`: Force CPU-only mode
-- **VRAM Calculation**: Automatically calculates optimal layers (~150MB/layer for 7B Q4_K_M)
+- **VRAM Calculation**: Automatically calculates optimal layers (~80MB/layer for 2B Q4_K_M)
 - **Safety Buffer**: Leaves 1GB VRAM free for other operations
 - **Streaming**: Supported for real-time token generation
 - **No Task Queue** - All LLM calls are async and wait for completion
+- **No Model Switching** - Single fixed model only
 
 ## Video Processing
 
@@ -138,42 +138,34 @@ POST /api/videos/youtube
 ↓
 1. Download (yt-dlp) - async
 2. Segment (timestamp-based, 5-min) - async
-3. Transcribe (Whisper) - async
-4. Generate study plan (LLM) - async
-5. Return complete video object
+3. Snap to sentence boundaries - align chunks to transcript sentence head/tail
+4. Transcribe (YouTube subtitle first, Whisper fallback) - async
+5. Generate study plan (LLM) - async
+6. Return complete video object
 ```
 
 API waits for all steps to complete before returning response.
 
 ### Chunking Strategy
-- **Time-based only**: User-adjustable 1-10 minutes, defaults to 5 minutes
+- **Time-based with sentence snap**: ~5 minutes, snap to head/tail of sentences
 - **No physical splitting**: Use original video with timestamp segments
-- No character-based or scene-based chunking
-- Sequential virtual chunks: (0:00-5:00), (5:00-10:00), etc.
+- Sentence-aware boundaries: Chunks align with transcript sentences
+- Sequential virtual chunks: (0:00-5:00), (5:00-10:00), etc. with sentence boundaries
 - Video player seeks to timestamp when navigating chunks
 
 ## Storage Structure
 
 ```
 /data/
-├── users/
-│   └── {user_id}/
-│       ├── videos/         # Downloaded from YouTube (original file)
-│       ├── transcripts/    # SRT, VTT, JSON
-│       ├── audio/          # Extracted audio
-│       ├── courses/        # Course data
-│       └── exams/          # Exam history
-├── shared/
-│   └── models/             # LLM model files
+├── videos/             # Downloaded from YouTube (original file)
+├── transcripts/        # JSON (YouTube subtitles or Whisper output)
+├── audio/              # Extracted audio
+├── courses/            # Course data
+└── shared/
+    └── models/         # LLM model files (Qwen3.5-2B-Q4_K_M.gguf)
 ```
 
-**Note**: No physical chunk files - chunks are virtual with timestamps into the original video.
-
-## Authentication
-
-- **Simple email/password authentication**
-- JWT tokens for session management
-- No OAuth (Google, GitHub, etc.) - removed from scope
+**Note**: No physical chunk files - chunks are virtual with timestamps into the original video. Chunks snap to sentence boundaries.
 
 ## API Behavior
 
@@ -187,9 +179,11 @@ async def create_video_from_youtube(request: YouTubeRequest):
     video_path = await download_youtube(request.url)
     # 2. Segment (async - virtual chunks with timestamps)
     chunks = await segment_video(video_path, chunk_duration=300)
-    # 3. Transcribe (async)
+    # 3. Snap to sentences (async - align to transcript)
+    chunks = await snap_to_sentences(chunks, transcript)
+    # 4. Transcribe (async)
     transcript = await transcribe_video(video_path)
-    # 4. Generate study plan (async)
+    # 5. Generate study plan (async)
     study_plan = await generate_study_plan(transcript)
     # Return complete result
     return VideoResponse(
@@ -250,8 +244,8 @@ uv lock
 
 ```bash
 cd frontend
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 ### Docker
@@ -285,20 +279,9 @@ uv pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llam
 uv lock
 ```
 
-### LLM Setup (AMD GPU)
-
-```bash
-# Install with ROCm support
-cd backend
-uv pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/rocm62
-
-# Re-lock dependencies
-uv lock
-```
-
 ## Resources
 
 - FastAPI: https://fastapi.tiangolo.com
 - SQLAlchemy: https://docs.sqlalchemy.org
-- React: https://react.dev
+- Vue: https://vuejs.org
 - llama-cpp-python: https://github.com/abetlen/llama-cpp-python

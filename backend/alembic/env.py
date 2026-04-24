@@ -3,9 +3,9 @@
 import asyncio
 from logging.config import fileConfig
 
-from sqlalchemy import pool
+from sqlalchemy import pool, text
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
+from sqlalchemy.ext.asyncio import async_engine_from_config, create_async_engine
 
 from alembic import context
 
@@ -54,13 +54,15 @@ async def run_async_migrations() -> None:
     configuration = config.get_section(config.config_ini_section)
     configuration["sqlalchemy.url"] = settings.DATABASE_URL
 
-    connectable = async_engine_from_config(
-        configuration,
-        prefix="sqlalchemy.",
+    # SQLite doesn't need pooling, use NullPool
+    connectable = create_async_engine(
+        settings.DATABASE_URL,
         poolclass=pool.NullPool,
     )
 
     async with connectable.connect() as connection:
+        # Enable foreign keys for SQLite
+        await connection.execute(text("PRAGMA foreign_keys = ON"))
         await connection.run_sync(do_run_migrations)
 
     await connectable.dispose()

@@ -9,9 +9,8 @@ Use this skill when transcribing video audio, parsing subtitle files, or identif
 ## Guidelines
 
 ### Transcription Priority
-1. **User-supplied SRT/VTT files** (highest priority)
-2. **Embedded subtitles** (extract via FFmpeg)
-3. **Whisper transcription** (fallback)
+1. **YouTube subtitles** (via yt-dlp, preferred)
+2. **Whisper transcription** (faster-whisper, fallback)
 
 ### Subtitle Parsing
 

@@ -10,7 +10,6 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "001"
@@ -25,9 +24,8 @@ def upgrade() -> None:
         "users",
         sa.Column(
             "id",
-            postgresql.UUID(as_uuid=True),
+            sa.String(36),
             primary_key=True,
-            server_default=sa.text("gen_random_uuid()"),
         ),
         sa.Column("email", sa.String(255), nullable=False, unique=True, index=True),
         sa.Column("password_hash", sa.String(255), nullable=False),
@@ -49,13 +47,12 @@ def upgrade() -> None:
         "videos",
         sa.Column(
             "id",
-            postgresql.UUID(as_uuid=True),
+            sa.String(36),
             primary_key=True,
-            server_default=sa.text("gen_random_uuid()"),
         ),
         sa.Column(
             "user_id",
-            postgresql.UUID(as_uuid=True),
+            sa.String(36),
             sa.ForeignKey("users.id", ondelete="CASCADE"),
             nullable=False,
         ),
@@ -86,13 +83,12 @@ def upgrade() -> None:
         "video_chunks",
         sa.Column(
             "id",
-            postgresql.UUID(as_uuid=True),
+            sa.String(36),
             primary_key=True,
-            server_default=sa.text("gen_random_uuid()"),
         ),
         sa.Column(
             "video_id",
-            postgresql.UUID(as_uuid=True),
+            sa.String(36),
             sa.ForeignKey("videos.id", ondelete="CASCADE"),
             nullable=False,
         ),
@@ -100,7 +96,7 @@ def upgrade() -> None:
         sa.Column("start_time", sa.Float(), nullable=False),
         sa.Column("end_time", sa.Float(), nullable=False),
         sa.Column("duration", sa.Float(), nullable=False),
-        sa.Column("transcript", postgresql.JSONB(), nullable=True),
+        sa.Column("transcript", sa.JSON(), nullable=True),
         sa.Column("status", sa.String(50), nullable=False, server_default="pending"),
         sa.Column(
             "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
@@ -121,13 +117,12 @@ def upgrade() -> None:
         "courses",
         sa.Column(
             "id",
-            postgresql.UUID(as_uuid=True),
+            sa.String(36),
             primary_key=True,
-            server_default=sa.text("gen_random_uuid()"),
         ),
         sa.Column(
             "user_id",
-            postgresql.UUID(as_uuid=True),
+            sa.String(36),
             sa.ForeignKey("users.id", ondelete="CASCADE"),
             nullable=False,
         ),
@@ -153,24 +148,23 @@ def upgrade() -> None:
         "course_videos",
         sa.Column(
             "id",
-            postgresql.UUID(as_uuid=True),
+            sa.String(36),
             primary_key=True,
-            server_default=sa.text("gen_random_uuid()"),
         ),
         sa.Column(
             "course_id",
-            postgresql.UUID(as_uuid=True),
+            sa.String(36),
             sa.ForeignKey("courses.id", ondelete="CASCADE"),
             nullable=False,
         ),
         sa.Column(
             "video_id",
-            postgresql.UUID(as_uuid=True),
+            sa.String(36),
             sa.ForeignKey("videos.id", ondelete="CASCADE"),
             nullable=False,
         ),
         sa.Column("order_index", sa.Integer(), nullable=False),
-        sa.Column("study_plan", postgresql.JSONB(), nullable=True),
+        sa.Column("study_plan", sa.JSON(), nullable=True),
         sa.Column("exam_status", sa.String(50), nullable=False, server_default="pending"),
         sa.Column(
             "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
@@ -190,13 +184,12 @@ def upgrade() -> None:
         "study_plans",
         sa.Column(
             "id",
-            postgresql.UUID(as_uuid=True),
+            sa.String(36),
             primary_key=True,
-            server_default=sa.text("gen_random_uuid()"),
         ),
         sa.Column(
             "video_id",
-            postgresql.UUID(as_uuid=True),
+            sa.String(36),
             sa.ForeignKey("videos.id", ondelete="CASCADE"),
             nullable=False,
             unique=True,
@@ -205,9 +198,9 @@ def upgrade() -> None:
         sa.Column("duration", sa.String(50), nullable=False),
         sa.Column("overall_difficulty", sa.String(10), nullable=True),
         sa.Column("estimated_time", sa.String(100), nullable=True),
-        sa.Column("chunks", postgresql.JSONB(), nullable=False, server_default="[]"),
-        sa.Column("vocabulary", postgresql.JSONB(), nullable=False, server_default="[]"),
-        sa.Column("grammar", postgresql.JSONB(), nullable=False, server_default="[]"),
+        sa.Column("chunks", sa.JSON(), nullable=False, server_default="[]"),
+        sa.Column("vocabulary", sa.JSON(), nullable=False, server_default="[]"),
+        sa.Column("grammar", sa.JSON(), nullable=False, server_default="[]"),
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column(
             "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
@@ -226,19 +219,18 @@ def upgrade() -> None:
         "study_progress",
         sa.Column(
             "id",
-            postgresql.UUID(as_uuid=True),
+            sa.String(36),
             primary_key=True,
-            server_default=sa.text("gen_random_uuid()"),
         ),
         sa.Column(
             "user_id",
-            postgresql.UUID(as_uuid=True),
+            sa.String(36),
             sa.ForeignKey("users.id", ondelete="CASCADE"),
             nullable=False,
         ),
         sa.Column(
             "video_id",
-            postgresql.UUID(as_uuid=True),
+            sa.String(36),
             sa.ForeignKey("videos.id", ondelete="CASCADE"),
             nullable=False,
         ),
@@ -264,13 +256,12 @@ def upgrade() -> None:
         "vocabularies",
         sa.Column(
             "id",
-            postgresql.UUID(as_uuid=True),
+            sa.String(36),
             primary_key=True,
-            server_default=sa.text("gen_random_uuid()"),
         ),
         sa.Column(
             "user_id",
-            postgresql.UUID(as_uuid=True),
+            sa.String(36),
             sa.ForeignKey("users.id", ondelete="CASCADE"),
             nullable=False,
         ),
@@ -302,19 +293,18 @@ def upgrade() -> None:
         "exams",
         sa.Column(
             "id",
-            postgresql.UUID(as_uuid=True),
+            sa.String(36),
             primary_key=True,
-            server_default=sa.text("gen_random_uuid()"),
         ),
         sa.Column(
             "user_id",
-            postgresql.UUID(as_uuid=True),
+            sa.String(36),
             sa.ForeignKey("users.id", ondelete="CASCADE"),
             nullable=False,
         ),
         sa.Column(
             "video_id",
-            postgresql.UUID(as_uuid=True),
+            sa.String(36),
             sa.ForeignKey("videos.id", ondelete="CASCADE"),
             nullable=False,
         ),
@@ -340,19 +330,18 @@ def upgrade() -> None:
         "exam_questions",
         sa.Column(
             "id",
-            postgresql.UUID(as_uuid=True),
+            sa.String(36),
             primary_key=True,
-            server_default=sa.text("gen_random_uuid()"),
         ),
         sa.Column(
             "exam_id",
-            postgresql.UUID(as_uuid=True),
+            sa.String(36),
             sa.ForeignKey("exams.id", ondelete="CASCADE"),
             nullable=False,
         ),
         sa.Column("question_type", sa.String(50), nullable=False),
         sa.Column("question_text", sa.Text(), nullable=False),
-        sa.Column("options", postgresql.JSONB(), nullable=True),
+        sa.Column("options", sa.JSON(), nullable=True),
         sa.Column("correct_answer", sa.Text(), nullable=False),
         sa.Column("explanation", sa.Text(), nullable=True),
         sa.Column("order_index", sa.Integer(), nullable=False),
@@ -373,13 +362,12 @@ def upgrade() -> None:
         "exam_results",
         sa.Column(
             "id",
-            postgresql.UUID(as_uuid=True),
+            sa.String(36),
             primary_key=True,
-            server_default=sa.text("gen_random_uuid()"),
         ),
         sa.Column(
             "exam_id",
-            postgresql.UUID(as_uuid=True),
+            sa.String(36),
             sa.ForeignKey("exams.id", ondelete="CASCADE"),
             nullable=False,
             unique=True,
@@ -387,7 +375,7 @@ def upgrade() -> None:
         sa.Column("score", sa.Float(), nullable=False),
         sa.Column("correct_count", sa.Integer(), nullable=False),
         sa.Column("total_count", sa.Integer(), nullable=False),
-        sa.Column("answers", postgresql.JSONB(), nullable=False, server_default="[]"),
+        sa.Column("answers", sa.JSON(), nullable=False, server_default="[]"),
         sa.Column("feedback", sa.Text(), nullable=True),
         sa.Column(
             "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False

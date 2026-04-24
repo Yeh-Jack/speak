@@ -20,49 +20,45 @@
 ### System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│ Frontend (React)                                                │
-│ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────────────┐       │
-│ │ Login    │ │ Course   │ │ Video    │ │ Exam System    │       │
-│ │ Email    │ │ List     │ │ Player   │ │ (SM-2)         │       │
-│ └──────────┘ └──────────┘ └──────────┘ └────────────────┘       │
-└────────────────────────────┬────────────────────────────────────┘
-                             │ REST API + WebSocket
-┌────────────────────────────┴────────────────────────────────────┐
-│ Backend (FastAPI) - Async I/O                                   │
-│ ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌─────────────┐       │
-│ │ Auth      │ │ Video     │ │ LLM       │ │ Study       │       │
-│ │ Service   │ │ Service   │ │ Service   │ │ Service     │       │
-│ └───────────┘ └───────────┘ └───────────┘ └─────────────┘       │
-│ ┌───────────┐ ┌───────────┐ ┌───────────┐                       │
-│ │ Speaking  │ │ Exam      │ │ Vocab     │                       │
-│ │ Service   │ │ Service   │ │ Service   │                       │
-│ └───────────┘ └───────────┘ └───────────┘                       │
-└────────────────────────────┬────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────┐
+│ Frontend (Vue 3.5 + TypeScript)                           │
+│ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────────────┐ │
+│ │  Home    │ │ Course   │ │ Video    │ │    Speaking    │ │
+│ │  Page    │ │  List    │ │ Player   │ │   Practice     │ │
+│ └──────────┘ └──────────┘ └──────────┘ └────────────────┘ │
+└────────────────────────────┬──────────────────────────────┘
+                             │ REST API
+┌────────────────────────────┴──────────────────────────────┐
+│ Backend (FastAPI) - Async I/O                             │
+│ ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌─────────────┐ │
+│ │  Video    │ │   LLM     │ │   Study   │ │   Speaking  │ │
+│ │ Service   │ │ Service   │ │ Service   │ │   Service   │ │
+│ └───────────┘ └───────────┘ └───────────┘ └─────────────┘ │
+└────────────────────────────┬──────────────────────────────┘
                              │
-            ┌────────────────┴────────────────┐
-            ▼                                 ▼
-┌───────────────────────┐  ┌─────────────────────────────────────┐
-│ PostgreSQL            │  │ llama-cpp-python + GPUtil           │
-│ (Database)            │  │ (GPU auto-detect)                   │
-└───────────────────────┘  └─────────────────────────────────────┘
+          ┌──────────────────┴──────────┐
+          ▼                             ▼
+┌─────────────────┐      ┌────────────────────────────┐
+│ SQLite3         │      │ llama-cpp-python + GPUtil  │
+│ (learning.db)   │      │ (Qwen3.5-2B-Q4_K_M.gguf)   │
+└─────────────────┘      └────────────────────────────┘
 
+**No Authentication** - Single user, no auth required
 **No Queue** - All operations use async/await and wait for completion
+**Single LLM** - Fixed model: Qwen3.5-2B-Q4_K_M.gguf
 ```
 
 ### Component Responsibilities
 
 | Component | Responsibility | Technology |
 |-----------|---------------|------------|
-| **Frontend** | UI rendering, user interaction, video playback, audio recording | React 18+, TypeScript, Vite, pnpm |
-| **API Gateway** | Request routing, authentication, rate limiting | FastAPI, JWT |
-| **Auth Service** | User authentication (email/password), token management | JWT |
+| **Frontend** | UI rendering, user interaction, video playback, audio recording | Vue 3.5+, TypeScript, Vite, pnpm |
 | **Video Service** | YouTube download, chunking, storage management | FFmpeg, yt-dlp |
 | **Transcript Service** | YouTube subtitle extraction, Whisper transcription | pysubs2, faster-whisper |
 | **LLM Service** | Model switching, chat completion, study plan generation, GPU auto-config | llama-cpp-python, GPUtil |
 | **Study Service** | Progress tracking, vocabulary management, learning analytics | SQLAlchemy |
-| **Exam Service** | Question generation, SM-2 algorithm, scoring | Custom implementation |
 
+**Single User** - No authentication required.
 **No Background Task Queue** - All processing is immediate async I/O.
 
 ---
@@ -79,28 +75,24 @@ backend/
 │   ├── config.py                  # Configuration management
 │   │
 │   ├── api/                       # API layer
-│   │   ├── __init__.py
-│   │   ├── deps.py                # Dependencies (auth, db session)
-│   │   ├── v1/
-│   │   │   ├── __init__.py
-│   │   │   ├── endpoints/
-│   │   │   │   ├── __init__.py
-│   │   │   │   ├── auth.py        # Auth endpoints (email/password)
-│   │   │   │   ├── courses.py     # Course endpoints
-│   │   │   │   ├── videos.py      # Video endpoints (YouTube only)
-│   │   │   │   ├── learning.py    # Learning endpoints
-│   │   │   │   ├── speaking.py    # Speaking endpoints
-│   │   │   │   ├── exams.py       # Exam endpoints
-│   │   │   │   ├── models.py      # LLM model endpoints
-│   │   │   │   └── chat.py        # Chat endpoints
-│   │   │   └── router.py          # API router
-│   │   └── v2/                    # Future API versions
-│   │
-│   ├── core/                      # Core functionality
-│   │   ├── __init__.py
-│   │   ├── security.py            # JWT, password hashing
-│   │   ├── config.py              # Pydantic settings
-│   │   └── logger.py              # Logging configuration
+│ │ ├── __init__.py
+│ │ ├── deps.py # Dependencies (db session)
+│ │ ├── v1/
+│ │ │ ├── __init__.py
+│ │ │ ├── endpoints/
+│ │ │ │ ├── __init__.py
+│ │ │ │ ├── courses.py # Course endpoints
+│ │ │ │ ├── videos.py # Video endpoints (YouTube only)
+│ │ │ │ ├── learning.py # Learning endpoints
+│ │ │ │ ├── speaking.py # Speaking endpoints
+│ │ │ │ └── chat.py # Chat endpoints
+│ │ │ └── router.py # API router
+│ │ └── v2/ # Future API versions
+│ │
+│ ├── core/ # Core functionality
+│ │ ├── __init__.py
+│ │ ├── config.py # Pydantic settings
+│ │ └── logger.py # Logging configuration
 │   │
 │   ├── db/                        # Database layer
 │   │   ├── __init__.py
@@ -108,44 +100,37 @@ backend/
 │   │   ├── session.py             # Database session
 │   │   └── init_db.py             # Database initialization
 │   │
-│   ├── models/                    # SQLAlchemy models
-│   │   ├── __init__.py
-│   │   ├── user.py
-│   │   ├── video.py
-│   │   ├── course.py
-│   │   ├── transcript.py
-│   │   ├── study_plan.py
-│   │   ├── vocabulary.py
-│   │   └── exam.py
+│ ├── models/ # SQLAlchemy models
+│ │ ├── __init__.py
+│ │ ├── video.py
+│ │ ├── course.py
+│ │ ├── transcript.py
+│ │ ├── study_plan.py
+│ │ └── vocabulary.py
 │   │
-│   ├── schemas/                   # Pydantic schemas
-│   │   ├── __init__.py
-│   │   ├── user.py
-│   │   ├── video.py
-│   │   ├── course.py
-│   │   ├── transcript.py
-│   │   ├── study_plan.py
-│   │   ├── vocabulary.py
-│   │   ├── exam.py
-│   │   └── chat.py
+│ ├── schemas/ # Pydantic schemas
+│ │ ├── __init__.py
+│ │ ├── video.py
+│ │ ├── course.py
+│ │ ├── transcript.py
+│ │ ├── study_plan.py
+│ │ ├── vocabulary.py
+│ │ └── chat.py
 │   │
-│   ├── services/                  # Business logic (async)
-│   │   ├── __init__.py
-│   │   ├── auth_service.py
-│   │   ├── video_service.py       # Async YouTube download + chunk
-│   │   ├── transcript_service.py  # Async transcription
-│   │   ├── llm_service.py         # Async LLM calls
-│   │   ├── study_service.py
-│   │   ├── speaking_service.py
-│   │   └── exam_service.py
+│ ├── services/ # Business logic (async)
+│ │ ├── __init__.py
+│ │ ├── video_service.py # Async YouTube download + chunk
+│ │ ├── transcript_service.py # Async transcription
+│ │ ├── llm_service.py # Async LLM calls
+│ │ ├── study_service.py
+│ │ └── speaking_service.py
 │   │
-│   └── utils/                     # Utilities
-│       ├── __init__.py
-│       ├── file_utils.py          # File operations
+│ └── utils/ # Utilities
+│ ├── __init__.py
+│ ├── file_utils.py # File operations
 │ ├── chunk_utils.py # Video chunking (user-adjustable 1-10 min, default 5)
-│       ├── subtitle_utils.py      # Subtitle parsing
-│       ├── gpu_utils.py           # GPU detection and VRAM calculation
-│       └── sm2_utils.py           # SM-2 algorithm
+│ ├── subtitle_utils.py # Subtitle parsing
+│ └── gpu_utils.py # GPU detection and VRAM calculation
 │
 ├── alembic/                       # Database migrations
 │   ├── versions/
@@ -175,107 +160,96 @@ backend/
 ```
 frontend/
 ├── src/
-│   ├── main.tsx                   # React entry point
-│   ├── App.tsx                    # Root component
-│   ├── vite-env.d.ts              # Vite type definitions
+│   ├── main.ts # Vue entry point
+│   ├── App.vue # Root component
+│   ├── vite-env.d.ts # Vite type definitions
 │   │
-│   ├── components/                # Reusable components
+│   ├── components/ # Reusable Vue components
 │   │   ├── common/
-│   │   │   ├── Button.tsx
-│   │   │   ├── Input.tsx
-│   │   │   ├── Modal.tsx
-│   │   │   ├── Spinner.tsx
+│   │   │   ├── BaseButton.vue
+│   │   │   ├── BaseInput.vue
+│   │   │   ├── BaseModal.vue
+│   │   │   ├── BaseSpinner.vue
 │   │   │   └── index.ts
 │   │   │
 │   │   ├── layout/
-│   │   │   ├── Header.tsx
-│   │   │   ├── Sidebar.tsx
-│   │   │   ├── Footer.tsx
+│   │   │   ├── AppHeader.vue
+│   │   │   ├── AppSidebar.vue
+│   │   │   ├── AppFooter.vue
 │   │   │   └── index.ts
 │   │   │
 │   │   ├── video/
-│   │   │   ├── VideoPlayer.tsx
-│   │   │   ├── SubtitleTrack.tsx
-│   │   │   ├── ChunkNavigator.tsx
+│   │   │   ├── VideoPlayer.vue
+│   │   │   ├── SubtitleTrack.vue
+│   │   │   ├── ChunkNavigator.vue
 │   │   │   └── index.ts
 │   │   │
 │   │   ├── learning/
-│   │   │   ├── VocabularyCard.tsx
-│   │   │   ├── StudyPlanView.tsx
-│   │   │   ├── ProgressTracker.tsx
+│   │   │   ├── VocabularyCard.vue
+│   │   │   ├── StudyPlanView.vue
+│   │   │   ├── ProgressTracker.vue
 │   │   │   └── index.ts
 │   │   │
 │   │   ├── speaking/
-│   │   │   ├── AudioRecorder.tsx
-│   │   │   ├── PronunciationView.tsx
-│   │   │   └── index.ts
-│   │   │
-│   │   └── exam/
-│   │       ├── QuestionView.tsx
-│   │       ├── ExamTimer.tsx
-│   │       └── index.ts
+│ │ │ ├── AudioRecorder.vue
+│ │ │ ├── PronunciationView.vue
+│ │ │ └── index.ts
+│ │
+│ ├── views/ # Page components (Vue views)
+│ │ ├── DashboardView.vue
+│ │ ├── CourseListView.vue
+│ │ ├── CourseDetailView.vue
+│ │ ├── VideoPlayerView.vue
+│ │ ├── SpeakingPracticeView.vue
+│ │ └── SettingsView.vue
 │   │
-│   ├── pages/                     # Page components
-│   │   ├── LoginPage.tsx
-│   │   ├── DashboardPage.tsx
-│   │   ├── CourseListPage.tsx
-│   │   ├── CourseDetailPage.tsx
-│   │   ├── VideoPlayerPage.tsx
-│   │   ├── SpeakingPracticePage.tsx
-│   │   ├── ExamPage.tsx
-│   │   └── SettingsPage.tsx
+│ ├── composables/ # Vue composables
+│ │ ├── useVideo.ts
+│ │ ├── useLearning.ts
+│ │ ├── useSpeaking.ts
+│ │ └── index.ts
 │   │
-│   ├── hooks/                     # Custom React hooks
-│   │   ├── useAuth.ts
-│   │   ├── useVideo.ts
-│   │   ├── useLearning.ts
-│   │   ├── useSpeaking.ts
-│   │   ├── useExam.ts
-│   │   └── index.ts
-│   │
-│   ├── services/                  # API services
-│   │   ├── api.ts                 # Axios instance
-│   │   ├── auth.service.ts
-│   │   ├── course.service.ts
-│   │   ├── video.service.ts
-│   │   ├── learning.service.ts
-│   │   ├── speaking.service.ts
-│   │   ├── exam.service.ts
-│   │   └── index.ts
-│   │
-│   ├── stores/                    # State management (Zustand/Redux)
-│   │   ├── auth.store.ts
-│   │   ├── course.store.ts
-│   │   ├── video.store.ts
-│   │   └── index.ts
-│   │
-│   ├── types/                     # TypeScript types
-│   │   ├── user.ts
-│   │   ├── course.ts
-│   │   ├── video.ts
-│   │   ├── transcript.ts
-│   │   ├── exam.ts
-│   │   └── index.ts
-│   │
-│   ├── utils/                     # Utility functions
-│   │   ├── formatTime.ts
-│   │   ├── formatDate.ts
-│   │   ├── sm2.ts
-│   │   └── index.ts
-│   │
-│   └── constants/                 # Constants
-│       ├── routes.ts
-│       ├── config.ts
-│       └── index.ts
+│ ├── services/ # API services
+│ │ ├── api.ts # Axios instance
+│ │ ├── course.service.ts
+│ │ ├── video.service.ts
+│ │ ├── learning.service.ts
+│ │ ├── speaking.service.ts
+│ │ └── index.ts
+│ │
+│ ├── stores/ # Pinia state management
+│ │ ├── course.store.ts
+│ │ ├── video.store.ts
+│ │ └── index.ts
+│ │
+│ ├── router/ # Vue Router configuration
+│ │ ├── index.ts
+│ │ └── routes.ts
+│ │
+│ ├── types/ # TypeScript types
+│ │ ├── course.ts
+│ │ ├── video.ts
+│ │ ├── transcript.ts
+│ │ └── index.ts
+│ │
+│ ├── utils/ # Utility functions
+│ │ ├── formatTime.ts
+│ │ ├── formatDate.ts
+│ │ └── index.ts
+│ │
+│ └── constants/ # Constants
+│ ├── routes.ts
+│ ├── config.ts
+│ └── index.ts
 │
-├── public/                        # Static assets
-│   ├── favicon.ico
-│   └── logo.svg
+├── public/ # Static assets
+│ ├── favicon.ico
+│ └── logo.svg
 │
-├── tests/                         # Test files
-│   ├── components/
-│   ├── pages/
-│   └── utils/
+├── tests/ # Test files
+│ ├── components/
+│ ├── views/
+│ └── utils/
 │
 ├── package.json
 ├── tsconfig.json
@@ -343,13 +317,13 @@ class VideoService:
         """Get video by ID"""
         return await self.video_repo.get_by_id(video_id)
 
-    async def create_video_from_youtube(self, url: str, user_id: UUID) -> Video:
+    async def create_video_from_youtube(self, url: str) -> Video:
         """
         Create new video from YouTube URL.
         Processes immediately: download → chunk → transcribe → study plan.
         """
         # 1. Create video record
-        video = Video(youtube_url=url, user_id=user_id, source_type="youtube")
+        video = Video(youtube_url=url, source_type="youtube")
         video = await self.video_repo.create(video)
 
         # 2. Download (async I/O)
@@ -551,14 +525,14 @@ class LLMService:
 from typing import Optional, List, Dict
 from uuid import UUID
 
-def get_user(user_id: UUID) -> Optional[User]:
+def get_video(video_id: UUID) -> Optional[Video]:
     ...
 
 def process_videos(videos: List[Video]) -> Dict[str, int]:
     ...
 
 # ❌ Bad
-def get_user(user_id):
+def get_video(video_id):
     ...
 ```
 
@@ -668,10 +642,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-async def process_video(video_id: UUID, user_id: UUID):
+async def process_video(video_id: UUID):
     logger.info(f"Starting video processing", extra={
-        "video_id": str(video_id),
-        "user_id": str(user_id)
+        "video_id": str(video_id)
     })
 
     try:
@@ -711,35 +684,48 @@ async function getUser(id: any): any {
 }
 ```
 
-#### 2. React Best Practices
+#### 2. Vue 3.5 Best Practices
 
-```typescript
-// ✅ Good - Functional components with hooks
-import React, { useState, useEffect } from 'react';
+```vue
+<!-- ✅ Good - Vue 3.5 with <script setup> -->
+<script setup lang="ts">
+import { ref, computed, watch, onMounted } from 'vue';
 
-interface VideoPlayerProps {
+interface Props {
   videoId: string;
   onProgress: (progress: number) => void;
 }
 
-export const VideoPlayer: React.FC<VideoPlayerProps> = ({
-  videoId,
-  onProgress
-}) => {
-  const [currentTime, setCurrentTime] = useState(0);
+const props = defineProps<Props>();
 
-  const handleTimeUpdate = (time: number) => {
-    setCurrentTime(time);
-    onProgress(time);
-  };
+const currentTime = ref(0);
+const videoRef = ref<HTMLVideoElement | null>(null);
 
-  return (
-    <video
-      src={`/api/videos/${videoId}/stream`}
-      onTimeUpdate={(e) => handleTimeUpdate(e.currentTarget.currentTime)}
-    />
-  );
+const videoUrl = computed(() => `/api/videos/${props.videoId}/stream`);
+
+const handleTimeUpdate = () => {
+  if (videoRef.value) {
+    currentTime.value = videoRef.value.currentTime;
+    props.onProgress(currentTime.value);
+  }
 };
+
+watch(currentTime, (newTime) => {
+  console.log('Time updated:', newTime);
+});
+
+onMounted(() => {
+  console.log('Video player mounted');
+});
+</script>
+
+<template>
+  <video
+    ref="videoRef"
+    :src="videoUrl"
+    @timeupdate="handleTimeUpdate"
+  />
+</template>
 ```
 
 ---
@@ -811,135 +797,96 @@ Response:
 ### Key Tables
 
 ```sql
--- Users
-CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
 -- Videos (YouTube only)
 CREATE TABLE videos (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    title VARCHAR(500) NOT NULL,
-    description TEXT,
-    source_type VARCHAR(50) NOT NULL DEFAULT 'youtube',
-    youtube_url VARCHAR(1000) NOT NULL,
-    file_path VARCHAR(1000),              -- Downloaded file path
-    duration FLOAT NOT NULL,
-    chunk_duration FLOAT DEFAULT 300,     -- User-adjustable: 60-600 seconds, default 300
-    status VARCHAR(50) DEFAULT 'pending',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title VARCHAR(500) NOT NULL,
+  description TEXT,
+  source_type VARCHAR(50) NOT NULL DEFAULT 'youtube',
+  youtube_url VARCHAR(1000) NOT NULL,
+  file_path VARCHAR(1000), -- Downloaded file path
+  duration FLOAT NOT NULL,
+  chunk_duration FLOAT DEFAULT 300, -- User-adjustable: 60-600 seconds, default 300
+  status VARCHAR(50) DEFAULT 'pending',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Video Chunks (virtual - timestamps only, no physical files)
 CREATE TABLE video_chunks (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    video_id UUID NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
-    chunk_index INTEGER NOT NULL,         -- Sequential: 0, 1, 2...
-    start_time FLOAT NOT NULL,            -- In seconds (e.g., 0, 300, 600...)
-    end_time FLOAT NOT NULL,              -- In seconds (e.g., 300, 600, 900...)
-    duration FLOAT NOT NULL,              -- Calculated: end_time - start_time
-    -- Note: No file_path - use original video file with timestamps
-    transcript JSONB,                     -- [{start: 0.0, end: 5.0, text: "..."}]
-    status VARCHAR(50) DEFAULT 'pending',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(video_id, chunk_index)
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  video_id UUID NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+  chunk_index INTEGER NOT NULL, -- Sequential: 0, 1, 2...
+  start_time FLOAT NOT NULL, -- In seconds (e.g., 0, 300, 600...)
+  end_time FLOAT NOT NULL, -- In seconds (e.g., 300, 600, 900...)
+  duration FLOAT NOT NULL, -- Calculated: end_time - start_time
+  -- Note: No file_path - use original video file with timestamps
+  transcript JSONB, -- [{start: 0.0, end: 5.0, text: "..."}]
+  status VARCHAR(50) DEFAULT 'pending',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(video_id, chunk_index)
 );
 
 -- Courses
 CREATE TABLE courses (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    title VARCHAR(500) NOT NULL,
-    description TEXT,
-    status VARCHAR(50) DEFAULT 'pending',
-    current_video_index INTEGER DEFAULT 0,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title VARCHAR(500) NOT NULL,
+  description TEXT,
+  status VARCHAR(50) DEFAULT 'pending',
+  current_video_index INTEGER DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Course Videos (junction table)
 CREATE TABLE course_videos (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
-    video_id UUID NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
-    order_index INTEGER NOT NULL,
-    study_plan JSONB,                     -- Generated by LLM
-    exam_status VARCHAR(50) DEFAULT 'pending',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(course_id, order_index)
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+  video_id UUID NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+  order_index INTEGER NOT NULL,
+  study_plan JSONB, -- Generated by LLM
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(course_id, order_index)
 );
 
 -- Study Progress
 CREATE TABLE study_progress (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    video_id UUID NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
-    chunk_index INTEGER NOT NULL,
-    current_timestamp FLOAT NOT NULL,
-    sentence_index INTEGER,
-    completed BOOLEAN DEFAULT FALSE,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(user_id, video_id, chunk_index)
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  video_id UUID NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+  chunk_index INTEGER NOT NULL,
+  current_timestamp FLOAT NOT NULL,
+  sentence_index INTEGER,
+  completed BOOLEAN DEFAULT FALSE,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(video_id, chunk_index)
 );
 
 -- Vocabulary
 CREATE TABLE vocabularies (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    word VARCHAR(200) NOT NULL,
-    definition TEXT,
-    context TEXT,
-    cefr_level VARCHAR(10),
-    review_count INTEGER DEFAULT 0,
-    next_review DATE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(user_id, word)
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  word VARCHAR(200) NOT NULL,
+  definition TEXT,
+  context TEXT,
+  cefr_level VARCHAR(10),
+  review_count INTEGER DEFAULT 0,
+  next_review DATE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(word)
 );
 
 -- Indexes
-CREATE INDEX idx_videos_user_id ON videos(user_id);
 CREATE INDEX idx_videos_status ON videos(status);
 CREATE INDEX idx_chunks_video_id ON video_chunks(video_id);
-CREATE INDEX idx_courses_user_id ON courses(user_id);
-CREATE INDEX idx_progress_user_video ON study_progress(user_id, video_id);
-CREATE INDEX idx_vocabularies_user ON vocabularies(user_id);
 
 -- Note: No task/background_tasks table - processing is immediate
+-- Note: Single-user application - no user authentication required
 ```
 
 ---
 
 ## Security Guidelines
 
-### 1. Authentication
-
-```python
-from datetime import datetime, timedelta
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
-
-def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
-
-def create_access_token(data: dict, expires_delta: timedelta = None):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=30))
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
-```
-
-### 2. Input Validation
+### 1. Input Validation
 
 ```python
 # ✅ Good - Validate all inputs
@@ -990,11 +937,9 @@ from app.services.video_service import VideoService
 @pytest.mark.asyncio
 async def test_create_video_from_youtube(video_service):
     video = await video_service.create_video_from_youtube(
-        url="https://youtube.com/watch?v=xxx",
-        user_id="uuid"
+        url="https://youtube.com/watch?v=xxx"
     )
     assert video.youtube_url == "https://youtube.com/watch?v=xxx"
-    assert video.user_id == "uuid"
     # Verify all processing completed (download, chunk, transcribe, study plan)
     assert video.status == "ready"
     chunks = await video_service.get_chunks(video.id)
@@ -1004,8 +949,7 @@ async def test_create_video_from_youtube(video_service):
 async def test_video_processing_pipeline(video_service):
     """Test complete pipeline runs without errors."""
     video = await video_service.create_video_from_youtube(
-        url="https://youtube.com/watch?v=test",
-        user_id="user-uuid"
+        url="https://youtube.com/watch?v=test"
     )
     assert video.status == "ready"
     assert video.file_path is not None
@@ -1017,12 +961,12 @@ async def test_video_processing_pipeline(video_service):
     assert study_plan is not None
 ```
 
-### Frontend Testing (Vitest + React Testing Library)
+### Frontend Testing (Vitest + Vue Testing Library)
 
 ```typescript
-// tests/components/VideoPlayer.test.tsx
-import { render, screen, waitFor } from '@testing-library/react';
-import { VideoPlayer } from '@/components/video/VideoPlayer';
+// tests/components/VideoPlayer.test.ts
+import { render, screen, waitFor } from '@testing-library/vue';
+import { VideoPlayer } from '@/components/video/VideoPlayer.vue';
 
 test('displays video title', async () => {
   render(<VideoPlayer videoId="test-id" title="Test Video" />);
@@ -1051,8 +995,8 @@ The system uses **virtual time-based chunking** (user-adjustable 1-10 minutes, d
 └────────┬────────────────────────────────────────────────────┘
          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 1. Download Video (yt-dlp) → WebM                           │
-│    async subprocess call                                      │
+│ 1. Download Video (yt-dlp) → MP4/WebM │
+│ async subprocess call │
 └────────┬────────────────────────────────────────────────────┘
          ▼
 ┌─────────────────────────────────────────────────────────────┐
@@ -1098,8 +1042,7 @@ async def create_video_from_youtube(request: YouTubeRequest):
     """
     # All operations are async and awaited
     video = await video_service.create_video_from_youtube(
-        url=request.url,
-        user_id=request.user_id
+        url=request.url
     )
 
     # Return complete result
@@ -1331,15 +1274,14 @@ class SpeakingService:
 # User speaking practice record
 class SpeakingPracticeRecord:
     id: UUID
-    user_id: UUID
     video_id: UUID
-    segment_start: float      # Timestamp in video
+    segment_start: float # Timestamp in video
     segment_end: float
-    character_text: str       # Original character line
-    user_recording_path: str  # Path to user's audio
-    similarity_score: float   # 0.0 - 1.0
-    feedback: str             # LLM-generated feedback
-    attempts: int             # Number of retries
+    character_text: str # Original character line
+    user_recording_path: str # Path to user's audio
+    similarity_score: float # 0.0 - 1.0
+    feedback: str # LLM-generated feedback
+    attempts: int # Number of retries
     created_at: datetime
 ```
 
@@ -1523,7 +1465,7 @@ llm = Llama(**config)
 |------------|--------|------------|------------------------|
 | 3B (Llama 3.2) | 28 | ~80MB | ~2.2GB |
 | 5B (Gemma 4) | 28 | ~100MB | ~2.8GB |
-| 7B (Qwen2.5) | 35 | ~150MB | ~5.3GB |
+| 7B (Qwen3.5) | 35 | ~150MB | ~5.3GB |
 | 8B (Gemma 4) | 36 | ~170MB | ~6.1GB |
 
 ---
@@ -1585,19 +1527,20 @@ def get_cached_model(model_name: str):
 ```
 
 ### 3. Video Processing (Immediate Async)
-
 - **No queue** - Process immediately using async/await
 - Use async subprocess for FFmpeg/yt-dlp
 - Stream large files instead of loading into memory
 - Use virtual chunking (timestamps only, no file splitting)
 - Frontend shows loading state while processing
+- **Supported video formats**: MP4, WebM
+- **Supported audio formats**: MP3, WebM
 
 ### 4. Frontend Optimization
 
-- Code splitting with React.lazy
+- Code splitting with Vue.lazy loading components
 - Lazy load images and videos
 - Debounce/throttle user inputs
-- Use React.memo for expensive components
+- Use v-memo for expensive component caching
 - Show loading indicators for long API calls
 
 ---
@@ -1609,6 +1552,8 @@ def get_cached_model(model_name: str):
 | 2025-04-08 | 1.0 | AI Assistant | Initial specification |
 | 2025-04-10 | 2.0 | AI Assistant | Simplified: YouTube-only, no OAuth, fixed chunks |
 | 2025-04-10 | 3.0 | AI Assistant | Removed job queue: all processing immediate async |
+| 2025-04-24 | 4.0 | AI Assistant | Added video/audio format constraints (MP4/WebM, MP3/WebM) |
+| 2025-04-24 | 5.0 | AI Assistant | Removed Auth Service, Exam Service, user references; cleaned up React remnants |
 
 ---
 

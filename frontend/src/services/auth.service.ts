@@ -1,6 +1,5 @@
-// Authentication service
 import api from './api';
-import { LoginRequest, RegisterRequest, Token, User } from '../types';
+import type { LoginRequest, RegisterRequest, Token, User } from '@/types';
 
 export const authService = {
   async login(data: LoginRequest): Promise<Token> {
