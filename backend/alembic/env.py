@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config, create_async_engine
 
 from alembic import context
 
-from app.core.config import settings
+from app.core.config import DATABASE_URL, settings
 from app.db.base import Base
 from app.models import *  # noqa: F401, F403 - Import all models
 
@@ -20,8 +20,8 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Set SQLAlchemy URL from settings
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# Set SQLAlchemy URL from fixed system constant
+config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
 # Add your model's MetaData object here for 'autogenerate' support
 target_metadata = Base.metadata
@@ -52,11 +52,11 @@ def do_run_migrations(connection: Connection) -> None:
 async def run_async_migrations() -> None:
     """Run migrations in async mode."""
     configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = settings.DATABASE_URL
+    configuration["sqlalchemy.url"] = DATABASE_URL
 
     # SQLite doesn't need pooling, use NullPool
     connectable = create_async_engine(
-        settings.DATABASE_URL,
+        DATABASE_URL,
         poolclass=pool.NullPool,
     )
 

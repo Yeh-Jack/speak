@@ -83,15 +83,21 @@ POST /api/videos/youtube
 - Next chunk starts at 4:58
 
 #### 1.4 Storage Structure
+
+Data is stored under PROJECT_ROOT/data/:
+
 ```
-/data/
+PROJECT_ROOT/data/
+├── db/
+│   └── learning.db     # SQLite database file
+├── models/             # LLM model files (Qwen3.5-2B-Q4_K_M.gguf)
 ├── videos/             # Downloaded from YouTube (original file)
 ├── transcripts/        # JSON (YouTube subtitles or Whisper output)
-├── audio/              # Extracted audio for Whisper
-├── courses/            # Course data
-└── shared/
-    └── models/         # LLM model files (Qwen3.5-2B-Q4_K_M.gguf)
+├── audios/             # Extracted audio for Whisper
+└── courses/            # Course data
 ```
+
+In Docker: PROJECT_ROOT is `/app`, so data is at `/app/data/`
 
 **Note**: No physical chunk files - chunks are virtual with timestamps into the original video. Chunks snap to sentence boundaries.
 
@@ -442,27 +448,31 @@ services:
 
 ### C. Environment Variables
 
-```bash
-# Database (SQLite)
-DATABASE_URL=sqlite+aiosqlite:///data/learning.db
+**Fixed System Constants** (set automatically, not configurable):
+- `PROJECT_ROOT` - Application root directory (Docker: `/app`, Local: calculated from file location)
+- `STORAGE_BASE_PATH` - Fixed at `PROJECT_ROOT/data`
+- `DATABASE_URL`      - Fixed at `PROJECT_ROOT/data/db/learning.db`
+- `LLM_MODEL_PATH`    - Fixed at `PROJECT_ROOT/data/models`
+- `SENTENCE_SNAP`     - Fixed at `True`
 
-# Storage
-STORAGE_BASE_PATH=/data
+**Configurable Environment Variables**:
+
+```bash
+# In Docker, PROJECT_ROOT is explicitly set by Dockerfile
+PROJECT_ROOT=/app
 
 # LLM (llama-cpp-python) - Single fixed model
-LLM_MODEL_PATH=/data/shared/models
 DEFAULT_MODEL=Qwen3.5-2B-Q4_K_M.gguf
-LLM_GPU_LAYERS=-1          # -1=auto, 0=CPU only, N=specific layers
-LLM_CONTEXT_SIZE=4096      # Model context window
-LLM_THREADS=4              # CPU threads for inference
+LLM_GPU_LAYERS=-1             # -1=auto, 0=CPU only, N=specific layers
+LLM_CONTEXT_SIZE=4096         # Model context window
+LLM_THREADS=4                 # CPU threads for inference
 
 # YouTube Download
-YOUTUBE_DOWNLOAD_QUALITY=720    # 360, 480, 720, 1080
-YOUTUBE_AUDIO_QUALITY=128k       # Audio quality for extraction
+YOUTUBE_DOWNLOAD_QUALITY=720  # 360, 480, 720, 1080
+YOUTUBE_AUDIO_QUALITY=128k    # Audio quality for extraction
 
 # Chunking
-CHUNK_DURATION=300               # Target duration in seconds (~5 min)
-SENTENCE_SNAP=true               # Enable sentence boundary alignment
+CHUNK_DURATION=300            # Target duration in seconds (~5 min)
 ```
 
 ---

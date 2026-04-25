@@ -698,20 +698,25 @@ class YouTubeDownloadService:
 
 ## Storage Structure
 
+Data is stored under PROJECT_ROOT/data/:
+
 ```
-/data/
-├── users/
-│   └── {user_id}/
-│       ├── videos/              # Original uploads
-│       ├── chunks/
-│       │   ├── time_based/      # Default chunks
-│       │   └── character_based/ # Character-specific chunks
-│       │       └── {speaker_id}/
-│ ├── transcripts/ # JSON (YouTube subtitles or Whisper output)
-│       ├── audio/               # Extracted audio
-│       ├── speakers/            # Speaker profiles
-│       ├── courses/             # Course data
-│       └── exams/               # Exam history
+PROJECT_ROOT/data/
+├── db/
+│   └── learning.db     # SQLite database file
+├── models/             # LLM model files (Qwen3.5-2B-Q4_K_M.gguf)
+├── videos/             # Downloaded from YouTube (original file)
+├── transcripts/        # JSON (YouTube subtitles or Whisper output)
+├── audios/             # Extracted audio
+└── courses/            # Course data
+```
+
+In Docker: PROJECT_ROOT is `/app`, so data is at `/app/data/`
+
+**Note**:
+- Single-user application - no user subdirectories
+- No physical chunk files - chunks are virtual with timestamps into the original video
+- Chunks snap to sentence boundaries (SENTENCE_SNAP is fixed at `True`)
 ```
 
 ---

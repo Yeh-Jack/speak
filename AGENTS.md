@@ -155,15 +155,20 @@ API waits for all steps to complete before returning response.
 
 ## Storage Structure
 
+Data is stored under PROJECT_ROOT/data/:
+
 ```
-/data/
+PROJECT_ROOT/data/
+├── db/
+│   └── learning.db     # SQLite database file
+├── models/             # LLM model files (Qwen3.5-2B-Q4_K_M.gguf)
 ├── videos/             # Downloaded from YouTube (original file)
 ├── transcripts/        # JSON (YouTube subtitles or Whisper output)
-├── audio/              # Extracted audio
-├── courses/            # Course data
-└── shared/
-    └── models/         # LLM model files (Qwen3.5-2B-Q4_K_M.gguf)
+├── audios/             # Extracted audio
+└── courses/            # Course data
 ```
+
+In Docker: PROJECT_ROOT is explicitly set to `/app` via environment variable, so data is at `/app/data/`
 
 **Note**: No physical chunk files - chunks are virtual with timestamps into the original video. Chunks snap to sentence boundaries.
 
