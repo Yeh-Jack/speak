@@ -416,8 +416,8 @@ class LlamaCppProvider(LLMProvider):
         model_path: str,
         gpu_layers: int = -1,
         context_size: int = 4096,
-        model_size: str = "7B",
-        total_layers: int = 35
+        model_size: str = "2B",
+        total_layers: int = 26
     ):
         from app.utils.gpu_utils import gpu_manager
 
@@ -937,9 +937,9 @@ from app.services.video_service import VideoService
 @pytest.mark.asyncio
 async def test_create_video_from_youtube(video_service):
     video = await video_service.create_video_from_youtube(
-        url="https://youtube.com/watch?v=xxx"
+        url="https://www.youtube.com/watch?v=7rzYDM6vMtI"
     )
-    assert video.youtube_url == "https://youtube.com/watch?v=xxx"
+    assert video.youtube_url == "https://www.youtube.com/watch?v=7rzYDM6vMtI"
     # Verify all processing completed (download, chunk, transcribe, study plan)
     assert video.status == "ready"
     chunks = await video_service.get_chunks(video.id)
@@ -949,7 +949,7 @@ async def test_create_video_from_youtube(video_service):
 async def test_video_processing_pipeline(video_service):
     """Test complete pipeline runs without errors."""
     video = await video_service.create_video_from_youtube(
-        url="https://youtube.com/watch?v=test"
+        url="https://www.youtube.com/watch?v=7rzYDM6vMtI"
     )
     assert video.status == "ready"
     assert video.file_path is not None
@@ -1170,25 +1170,25 @@ A specialized practice mode where users learn to speak like a specific character
 ┌─────────────────────────────────────────────────────────────┐
 │ 2. PLAY (Once)                                              │
 │    - Play character's original audio once                   │
-│    - Video player seeks to sentence timestamp                 │
-│    - Auto-stop at end of sentence                             │
+│    - Video player seeks to sentence timestamp               │
+│    - Auto-stop at end of sentence                           │
 └────────┬────────────────────────────────────────────────────┘
          ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 3. ROLLBACK                                                 │
-│    - Auto-seek 3 seconds back (or to sentence start)          │
-│    - Pause, ready for user recording                          │
+│    - Auto-seek 3 seconds back (or to sentence start)        │
+│    - Pause, ready for user recording                        │
 └────────┬────────────────────────────────────────────────────┘
          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 4. USER SPEAK                                                 │
+│ 4. USER SPEAK                                               │
 │    - Show recording UI (red dot, waveform)                  │
-│    - User presses record and speaks the line                  │
+│    - User presses record and speaks the line                │
 │    - Auto-stop recording (or manual stop)                   │
 └────────┬────────────────────────────────────────────────────┘
          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 5. REPEAT OPTION (User Choice)                                │
+│ 5. REPEAT OPTION (User Choice)                              │
 │    ┌──────────┐  ┌──────────┐  ┌──────────┐                 │
 │    │ Compare  │  │ Retry    │  │ Next     │                 │
 │    │ (Step 6) │  │ (Step 2) │  │ Sentence │                 │
@@ -1196,11 +1196,11 @@ A specialized practice mode where users learn to speak like a specific character
 └────────┬────────────────────────────────────────────────────┘
          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 6. COMPARISON (Optional)                                      │
-│    - Play original audio                                      │
-│    - Play user recording                                      │
-│    - Show Whisper similarity score                            │
-│    - Show pronunciation feedback                              │
+│ 6. COMPARISON (Optional)                                    │
+│    - Play original audio                                    │
+│    - Play user recording                                    │
+│    - Show Whisper similarity score                          │
+│    - Show pronunciation feedback                            │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -1289,16 +1289,15 @@ class SpeakingPracticeRecord:
 
 ## GPU Configuration Utilities
 
-### NVIDIA and AMD GPU Detection
+### NVIDIA GPU Detection
 
-The project supports NVIDIA (CUDA) and AMD (ROCm) GPUs with automatic vendor detection and backend selection.
+The project supports NVIDIA GPUs with automatic detection and CUDA backend selection.
 
 #### GPU Vendors and Backends
 
 | Vendor | Detection Method | Backend | Notes |
 |--------|-----------------|---------|-------|
 | **NVIDIA** | GPUtil | CUDA | Best performance, most mature |
-| **AMD** | rocm-smi / pyamdgpuinfo | ROCm | Linux only for pyamdgpuinfo |
 
 ```python
 # app/utils/gpu_utils.py
@@ -1308,12 +1307,10 @@ from typing import Optional, List
 
 class GPUVendor(Enum):
     NVIDIA = "nvidia"
-    AMD = "amd"
     UNKNOWN = "unknown"
 
 class GPUBackend(Enum):
     CUDA = "cuda"
-    ROCM = "rocm"
     CPU = "cpu"
 
 @dataclass
@@ -1326,13 +1323,12 @@ class GPUInfo:
     backend: GPUBackend
 
 class GPUManager:
-    """GPU manager for NVIDIA and AMD LLM configuration."""
+    """GPU manager for NVIDIA LLM configuration."""
 
     def detect_all_gpus(self) -> List[GPUInfo]:
-        """Detect GPUs from NVIDIA and AMD."""
+        """Detect NVIDIA GPUs."""
         self._gpus = []
-        self._detect_nvidia()  # GPUtil
-        self._detect_amd()     # rocm-smi or pyamdgpuinfo
+        self._detect_nvidia() # GPUtil
         return self._gpus
 
     def _detect_nvidia(self) -> bool:
@@ -1353,35 +1349,14 @@ class GPUManager:
         except ImportError:
             return False
 
-    def _detect_amd(self) -> bool:
-        """Detect AMD GPUs using rocm-smi or pyamdgpuinfo."""
-        # Try pyamdgpuinfo first (Linux only)
-        try:
-            import pyamdgpuinfo
-            for device in pyamdgpuinfo.get_devices():
-                self._gpus.append(GPUInfo(
-                    id=len(self._gpus),
-                    name=device.name or "AMD GPU",
-                    vendor=GPUVendor.AMD,
-                    total_memory_mb=device.memory_info.vram_total / (1024**2),
-                    free_memory_mb=device.memory_info.vram_free / (1024**2),
-                    backend=GPUBackend.ROCM
-                ))
-            return True
-        except ImportError:
-            pass
-        # Fallback to rocm-smi
-        return self._detect_amd_rocm_smi()
-
     def get_best_gpu(self) -> Optional[GPUInfo]:
-        """Get the best GPU (priority: NVIDIA > AMD)."""
+        """Get the best GPU (NVIDIA only)."""
         if not self._gpus:
             self.detect_all_gpus()
 
-        priority = {GPUVendor.NVIDIA: 2, GPUVendor.AMD: 1}
         sorted_gpus = sorted(
             self._gpus,
-            key=lambda g: (priority.get(g.vendor, 0), g.free_memory_mb),
+            key=lambda g: g.free_memory_mb,
             reverse=True
         )
         return sorted_gpus[0] if sorted_gpus else None
@@ -1401,11 +1376,11 @@ class GPUManager:
             config["backend"] = "cpu"
             return config
 
-        # Calculate optimal layers (~150MB per layer for 7B)
-        layer_memory = 150  # MB
-        available_vram = gpu.free_memory_mb - 1024  # Safety buffer
+        # Calculate optimal layers (~80MB per layer for 2B Q4_K_M)
+        layer_memory = 80 # MB
+        available_vram = gpu.free_memory_mb - 1024 # Safety buffer
         max_layers = int(available_vram / layer_memory)
-        layers = min(max_layers, 35)  # 35 layers for 7B model
+        layers = min(max_layers, 26) # 26 layers for 2B model
 
         config["n_gpu_layers"] = layers
         config["backend"] = gpu.backend.value
@@ -1415,14 +1390,11 @@ class GPUManager:
 gpu_manager = GPUManager()
 ```
 
-### Multi-Vendor Installation (using uv)
+### NVIDIA Installation (using uv)
 
 ```bash
 # NVIDIA (CUDA)
 uv pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121
-
-# AMD (ROCm)
-uv pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/rocm62
 
 # After installing GPU-specific wheels, re-lock dependencies
 uv lock
@@ -1432,13 +1404,12 @@ uv lock
 
 ```bash
 # GPU Configuration
-LLM_GPU_LAYERS=-1                    # -1=auto-detect, 0=CPU, N=specific layers
-LLM_MODEL_SIZE=7B                  # 3B, 5B, 7B, 8B (for VRAM calculation)
-LLM_CONTEXT_SIZE=4096              # Model context window
+LLM_GPU_LAYERS=-1 # -1=auto-detect, 0=CPU, N=specific layers
+LLM_MODEL_SIZE=2B # 2B, 3B (for VRAM calculation)
+LLM_CONTEXT_SIZE=4096 # Model context window
 
 # llama-cpp-python will auto-detect backend:
 # NVIDIA -> CUDA
-# AMD -> ROCm
 # No GPU detected -> CPU
 ```
 
@@ -1451,7 +1422,7 @@ import os
 
 # Get complete configuration
 config = gpu_manager.get_llama_config(
-    model_path="/data/models/qwen2.5-7b-q4_k_m.gguf",
+    model_path="/data/models/Qwen3.5-2B-Q4_K_M.gguf",
     env_gpu_layers=os.getenv("LLM_GPU_LAYERS", "-1")
 )
 
@@ -1463,10 +1434,8 @@ llm = Llama(**config)
 
 | Model Size | Layers | VRAM/Layer | Total GPU VRAM (Full) |
 |------------|--------|------------|------------------------|
+| 2B (Qwen3.5) | 26 | ~80MB | ~2.1GB |
 | 3B (Llama 3.2) | 28 | ~80MB | ~2.2GB |
-| 5B (Gemma 4) | 28 | ~100MB | ~2.8GB |
-| 7B (Qwen3.5) | 35 | ~150MB | ~5.3GB |
-| 8B (Gemma 4) | 36 | ~170MB | ~6.1GB |
 
 ---
 
