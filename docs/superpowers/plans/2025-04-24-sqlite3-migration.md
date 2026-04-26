@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Migrate the English Learning App from PostgreSQL to SQLite3 with database file at `/data/learning.db`
+**Goal:** Migrate the English Learning App from PostgreSQL to SQLite3 with database file at `PROJECT_ROOT/data/db/learning.db` (e.g., `/app/data/db/learning.db` in Docker)
 
 **Architecture:** Replace PostgreSQL+asyncpg with SQLite+aiosqlite while maintaining async SQLAlchemy 2.0 patterns. Update configuration, dependencies, Docker setup, and handle PostgreSQL-specific UUID type.
 
@@ -30,7 +30,7 @@
 **Files:**
 - Modify: `backend/app/core/config.py:13`
 
-**Note:** Database will be named `learning.db` and stored at `/data/learning.db`
+**Note:** Database will be named `learning.db` and stored at `PROJECT_ROOT/data/db/learning.db` (e.g., `/app/data/db/learning.db` in Docker)
 
 - [ ] **Step 1: Update DATABASE_URL default value**
 
@@ -41,7 +41,7 @@ DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/educa
 
 To:
 ```python
-DATABASE_URL: str = "sqlite+aiosqlite:///data/learning.db"
+DATABASE_URL: str = "sqlite+aiosqlite:////app/data/db/learning.db"
 ```
 
 - [ ] **Step 2: Commit the change**
@@ -316,8 +316,8 @@ services:
       dockerfile: Dockerfile
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRE_PASS:-postgres}@db:5432/${POSTGRES_DB:-education}
-      - STORAGE_BASE_PATH=/data
-      - LLM_MODEL_PATH=/data/shared/models
+      - STORAGE_BASE_PATH=/app/data
+      - LLM_MODEL_PATH=/app/data/models
       - DEFAULT_MODEL=qwen2.5-7b-q4_k_m.gguf
       - LLM_GPU_LAYERS=${LLM_GPU_LAYERS:--1}
       - LLM_CONTEXT_SIZE=4096
@@ -327,7 +327,7 @@ services:
       - YOUTUBE_DOWNLOAD_QUALITY=720
       - YOUTUBE_AUDIO_QUALITY=128k
     volumes:
-      - app_data:/data
+      - app_data:/app/data
     ports:
       - "8080:8080"
     depends_on:
@@ -335,6 +335,7 @@ services:
         condition: service_healthy
     command: >
       sh -c "cd /app &&
+      mkdir -p /app/data/db /app/data/models &&
       uv run alembic upgrade head &&
       uv run uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload"
 
@@ -367,9 +368,9 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     environment:
-      - DATABASE_URL=sqlite+aiosqlite:///data/learning.db
+      - DATABASE_URL=sqlite+aiosqlite:///data/db/learning.db
       - STORAGE_BASE_PATH=/data
-      - LLM_MODEL_PATH=/data/shared/models
+      - LLM_MODEL_PATH=/data/models
       - DEFAULT_MODEL=qwen2.5-7b-q4_k_m.gguf
       - LLM_GPU_LAYERS=${LLM_GPU_LAYERS:--1}
       - LLM_CONTEXT_SIZE=4096
@@ -447,7 +448,7 @@ async def init_db():
         # Create all tables
         await conn.run_sync(Base.metadata.create_all)
 
-    print("Database initialized successfully at /data/learning.db")
+    print("Database initialized successfully at /data/db/learning.db")
 
 
 if __name__ == "__main__":
@@ -499,8 +500,8 @@ cat /workspaces/education/backend/Dockerfile
 
 If the Dockerfile doesn't already create /data, add:
 ```dockerfile
-# Create data directory for SQLite and other storage
-RUN mkdir -p /data/shared/models /data/users
+# Create data directories for SQLite, models, videos, and other storage
+RUN mkdir -p /data/db /data/models /data/videos /data/transcripts /data/audio /data/courses
 ```
 
 - [ ] **Step 3: Commit the changes**
@@ -525,7 +526,7 @@ DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/education
 
 To:
 ```
-DATABASE_URL=sqlite+aiosqlite:///data/learning.db
+DATABASE_URL=sqlite+aiosqlite:///data/db/learning.db
 ```
 
 - [ ] **Step 2: Commit the changes**
@@ -558,11 +559,11 @@ cd /workspaces/education/backend
 uv run python scripts/init_db.py
 ```
 
-Expected output: `Database initialized successfully at /data/learning.db`
+Expected output: `Database initialized successfully at /data/db/learning.db`
 
 - [ ] **Step 4: Verify database file was created**
 ```bash
-ls -la /workspaces/education/data/learning.db
+ls -la /workspaces/education/data/db/learning.db
 ```
 
 Expected: File exists with non-zero size
@@ -618,7 +619,7 @@ git commit -m "test: verify SQLite database setup and connection" || echo "No ch
 ## Spec Coverage Check
 
 **Requirements covered:**
-- ✅ SQLite3 database at `/data/learning.db`
+- ✅ SQLite3 database at `/data/db/learning.db`
 - ✅ Async SQLAlchemy 2.0 patterns maintained
 - ✅ Removed PostgreSQL dependency
 - ✅ Updated Docker Compose configuration

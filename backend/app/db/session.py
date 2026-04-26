@@ -3,11 +3,11 @@
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.core.config import settings
+from app.core.config import DATABASE_URL, settings
 
 # Create async engine with SQLite-specific settings
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    DATABASE_URL,
     echo=settings.DEBUG,
     future=True,
 )

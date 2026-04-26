@@ -1,29 +1,21 @@
-version: "3.8"
-
 services:
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     environment:
-      - DATABASE_URL=sqlite+aiosqlite:///data/learning.db
-      - STORAGE_BASE_PATH=/data
-      - LLM_MODEL_PATH=/data/shared/models
-      - DEFAULT_MODEL=qwen2.5-7b-q4_k_m.gguf
+      - DEFAULT_MODEL=Qwen3.5-2B-Q4_K_M.gguf
       - LLM_GPU_LAYERS=${LLM_GPU_LAYERS:--1}
       - LLM_CONTEXT_SIZE=4096
-      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
-      - JWT_ALGORITHM=HS256
-      - JWT_EXPIRATION=24h
       - YOUTUBE_DOWNLOAD_QUALITY=720
       - YOUTUBE_AUDIO_QUALITY=128k
+      - CHUNK_DURATION=300
     volumes:
-      - app_data:/data
+      - app_data:/app/data
     ports:
       - "8080:8080"
     command: >
-      sh -c "cd /app &&
-      mkdir -p /data &&
+      sh -c "mkdir -p /app/data/{audios,courses,db,models,transcripts,videos} &&
       uv run alembic upgrade head &&
       uv run uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload"
 

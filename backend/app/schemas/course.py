@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CourseVideoBase(BaseModel):
@@ -22,7 +22,6 @@ class CourseVideoUpdate(BaseModel):
     """Schema for updating a course video."""
 
     order_index: int | None = None
-    exam_status: str | None = None
 
 
 class CourseVideo(CourseVideoBase):
@@ -34,7 +33,6 @@ class CourseVideo(CourseVideoBase):
     course_id: uuid.UUID
     video_id: uuid.UUID
     study_plan: dict | None = None
-    exam_status: str
     created_at: datetime
     updated_at: datetime
 
@@ -67,7 +65,6 @@ class Course(CourseBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    user_id: uuid.UUID
     status: str
     current_video_index: int
     course_videos: list[CourseVideo] = []
@@ -75,13 +72,7 @@ class Course(CourseBase):
     updated_at: datetime
 
 
-class CourseInDB(Course):
-    """Course schema with internal fields."""
-
-    pass
-
-
 class ReorderVideosRequest(BaseModel):
     """Schema for reordering videos in a course."""
 
-    video_orders: dict[uuid.UUID, int]  # video_id -> order_index
+    video_orders: dict[uuid.UUID, int]

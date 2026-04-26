@@ -1,21 +1,17 @@
 FROM python:3.13-slim
 
+RUN \
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    ffmpeg \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
+    apt-get update && apt-get install -y curl ffmpeg gcc && \
+    rm -rf /var/lib/apt/lists/* && \
 # Install uv
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+    curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    # Create data directories for audio, courses, SQLite, models, transcripts and videos.
+    mkdir -p /app/data/{audio,courses,db,models,transcripts,videos}
+
 ENV PATH="/root/.cargo/bin:${PATH}"
-
-# Set working directory
+ENV PROJECT_ROOT=/app
 WORKDIR /app
-
-# Create data directory for SQLite and other storage
-RUN mkdir -p /data/shared/models /data/users
 
 # Copy dependency files
 COPY pyproject.toml uv.lock ./

@@ -62,9 +62,8 @@ dependencies = [
     "alembic>=1.13.0",
     # LLM - llama-cpp-python with GPU support
     "llama-cpp-python>=0.2.26",
-    # GPU detection - NVIDIA and AMD support
+    # GPU detection - NVIDIA only
     "gputil>=1.4.0",
-    "pyamdgpuinfo>=2.1.6; sys_platform == 'linux'",
     # Video processing
     "ffmpeg-python>=0.2.0",
     "yt-dlp>=2024.1.0",

@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field, ConfigDict, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class VideoChunkBase(BaseModel):
@@ -56,6 +56,13 @@ class VideoCreate(BaseModel):
     youtube_url: str = Field(..., min_length=10)
     chunk_duration: float = Field(default=300.0, ge=60, le=600)
 
+    @field_validator("youtube_url")
+    @classmethod
+    def validate_youtube_url(cls, v: str) -> str:
+        if "youtube.com" not in v and "youtu.be" not in v:
+            raise ValueError("Invalid YouTube URL")
+        return v
+
 
 class VideoUpdate(BaseModel):
     """Schema for updating a video."""
@@ -71,7 +78,6 @@ class Video(VideoBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    user_id: uuid.UUID
     source_type: str
     file_path: str | None
     duration: float
@@ -79,12 +85,6 @@ class Video(VideoBase):
     chunks: list[VideoChunk] = []
     created_at: datetime
     updated_at: datetime
-
-
-class VideoInDB(Video):
-    """Video schema with internal fields."""
-
-    pass
 
 
 class VideoResponse(BaseModel):

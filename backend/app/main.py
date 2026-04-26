@@ -1,12 +1,13 @@
 """FastAPI application entry point."""
 
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.config import settings
 from app.api.v1.router import api_router
+from app.core.config import settings
 
 # Configure logging
 logging.basicConfig(
@@ -15,12 +16,29 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan context manager for startup/shutdown events."""
+    # Startup
+    logger.info("Starting up English Learning API")
+    try:
+        yield
+    except Exception as e:
+        logger.error(f"Application error during lifespan: {e}", exc_info=True)
+        raise
+    finally:
+        # Shutdown - always executes even if an exception occurred
+        logger.info("Shutting down English Learning API")
+
+
 # Create FastAPI app
 app = FastAPI(
     title="English Learning API",
     description="AI-powered English education platform API",
     version="0.1.0",
     debug=settings.DEBUG,
+    lifespan=lifespan,
 )
 
 # Add CORS middleware
@@ -50,15 +68,3 @@ async def root():
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "environment": settings.ENVIRONMENT}
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Startup event handler."""
-    logger.info("Starting up English Learning API")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Shutdown event handler."""
-    logger.info("Shutting down English Learning API")
