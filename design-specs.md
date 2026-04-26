@@ -1514,6 +1514,69 @@ def get_cached_model(model_name: str):
 
 ---
 
+## Phase 2 Implementation (Completed)
+
+### Overview
+
+Phase 2 implements the complete video processing pipeline with checkpoint-resume capability.
+
+### Implemented Services
+
+| Service | File | Description |
+|---------|------|-------------|
+| `DownloadService` | `app/services/download_service.py` | YouTube video download using yt-dlp |
+| `ChunkingService` | `app/services/chunking_service.py` | Hybrid Dynamic chunking with ±30s sentence snap |
+| `TranscriptionService` | `app/services/transcription_service.py` | YouTube subtitles first, Whisper fallback |
+| `VideoService` | `app/services/video_service.py` | Orchestrator with state machine |
+
+### State Machine
+
+```
+pending → downloading → downloading_complete → chunking → chunking_complete
+        → transcribing → transcribing_complete → studying → ready
+                                                               ↓
+                                                             failed
+```
+
+Each state transition is checkpointed. If a step fails, the video stays in the last successful state with `error_message` set. User can retry via `POST /api/videos/{id}/retry`.
+
+### Hybrid Dynamic Chunking Algorithm
+
+For each ideal 5-min boundary at time T:
+1. Search transcript entries in range [T-30s, T+30s]
+2. Find sentence-ending punctuation (`.!?`) nearest to T
+3. If found: snap chunk end to that boundary
+4. If not found: use ideal boundary T
+
+### API Endpoints (Phase 2)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/videos/youtube` | POST | Create video from YouTube URL, process through full pipeline |
+| `/api/v1/videos/{id}` | GET | Get video by ID |
+| `/api/v1/videos/{id}/retry` | POST | Retry processing from last checkpoint |
+| `/api/v1/videos/{id}/chunks` | GET | Get video chunks |
+
+### Database Schema Updates
+
+Added `error_message` field to videos table for checkpoint-resume:
+```sql
+ALTER TABLE videos ADD COLUMN error_message TEXT;
+```
+
+### Test Coverage
+
+| Test Suite | Tests | Status |
+|------------|-------|--------|
+| `test_exceptions.py` | 6 | ✅ |
+| `test_download_service.py` | 4 | ✅ |
+| `test_chunking_service.py` | 7 | ✅ |
+| `test_transcription_service.py` | 5 | ✅ |
+| `test_video_service.py` | 9 | ✅ |
+| **Total** | **31** | **All passing** |
+
+---
+
 ## Document History
 
 | Date | Version | Author | Changes |
@@ -1523,6 +1586,8 @@ def get_cached_model(model_name: str):
 | 2025-04-10 | 3.0 | AI Assistant | Removed job queue: all processing immediate async |
 | 2025-04-24 | 4.0 | AI Assistant | Added video/audio format constraints (MP4/WebM, MP3/WebM) |
 | 2025-04-24 | 5.0 | AI Assistant | Removed Auth Service, Exam Service, user references; cleaned up React remnants |
+| 2026-04-26 | 6.0 | AI Assistant | Phase 2 design: Hybrid Dynamic chunking (±30s sentence snap), checkpoint-resume state machine |
+| 2026-04-26 | 7.0 | AI Assistant | Phase 2 implementation complete: DownloadService, ChunkingService, TranscriptionService, VideoService (31 tests passing) |
 
 ---
 

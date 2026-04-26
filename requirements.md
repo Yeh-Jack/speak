@@ -311,11 +311,13 @@ POST /api/chat/stream               # Streaming chat response
 - SQLite schema design (single user, no auth)
 - Basic FastAPI structure
 
-### Phase 2: Video Pipeline (1 week)
-- YouTube download integration (yt-dlp)
-- FFmpeg chunking with sentence snap
-- **Immediate async processing** (no queue)
-- Local storage configuration
+### Phase 2: Video Pipeline ✅ (COMPLETED)
+- YouTube download integration (yt-dlp) ✅
+- **Hybrid Dynamic chunking** with ±30s sentence snap ✅
+- **Checkpoint-resume state machine** for error recovery ✅
+- **Immediate async processing** (no queue) ✅
+- Local storage configuration ✅
+- Video processing states: pending → downloading → downloading_complete → chunking → chunking_complete → transcribing → transcribing_complete → studying → ready (or failed) ✅
 
 ### Phase 3: Transcription (1 week)
 - YouTube subtitle extraction (yt-dlp)
