@@ -799,17 +799,18 @@ Response:
 ```sql
 -- Videos (YouTube only)
 CREATE TABLE videos (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  title VARCHAR(500) NOT NULL,
-  description TEXT,
-  source_type VARCHAR(50) NOT NULL DEFAULT 'youtube',
-  youtube_url VARCHAR(1000) NOT NULL,
-  file_path VARCHAR(1000), -- Downloaded file path
-  duration FLOAT NOT NULL,
-  chunk_duration FLOAT DEFAULT 300, -- User-adjustable: 60-600 seconds, default 300
-  status VARCHAR(50) DEFAULT 'pending',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+title VARCHAR(500) NOT NULL,
+description TEXT,
+source_type VARCHAR(50) NOT NULL DEFAULT 'youtube',
+youtube_url VARCHAR(1000) NOT NULL,
+file_path VARCHAR(1000), -- Downloaded file path
+duration FLOAT NOT NULL,
+chunk_duration FLOAT DEFAULT 300, -- User-adjustable: 60-600 seconds, default 300
+status VARCHAR(50) DEFAULT 'pending', -- pending, downloading, downloading_complete, chunking, chunking_complete, transcribing, transcribing_complete, studying, ready, failed
+error_message TEXT, -- Checkpoint-resume: stores error on failure
+created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Video Chunks (virtual - timestamps only, no physical files)
@@ -976,19 +977,244 @@ test('displays video title', async () => {
 
 ---
 
-## Video Chunking (Time-Based Only)
+## Video Processing Pipeline (Phase 2)
 
-### Overview
+### State Machine
 
-The system uses **virtual time-based chunking** (user-adjustable 1-10 minutes, default 5).
-- No physical splitting - use original video with timestamps
-- No character-based or scene-based chunking
-- No speaker diarization
-- Sequential virtual chunks: (0:00-5:00), (5:00-10:00), etc.
-- Video player seeks to timestamp for navigation
+The video processing pipeline implements a **state machine** with checkpoint-resume capability:
 
-### Processing Flow (Immediate, Async)
+```
+pending → downloading → downloading_complete → chunking → chunking_complete 
+         → transcribing → transcribing_complete → studying → ready
+         └────────────────────── or ───────────────────────────────┘
+                                    ↓
+                               failed (with error_message)
+```
 
+**States:**
+| State | Description |
+|-------|-------------|
+| `pending` | Video created, awaiting processing |
+| `downloading` | yt-dlp is downloading the video |
+| `downloading_complete` | Video downloaded successfully, ready for chunking |
+| `chunking` | Calculating chunks with sentence snap |
+| `chunking_complete` | Chunks created, ready for transcription |
+| `transcribing` | Extracting/generating subtitles |
+| `transcribing_complete` | Transcript ready, ready for study plan |
+| `studying` | LLM is generating study plan |
+| `ready` | All processing complete |
+| `failed` | Processing failed at some step |
+
+Each state transition is **checkpointed** to the database. On failure:
+- Video stays in the last successful state
+- `error_message` field is set with failure details
+- User can retry via `POST /api/videos/{id}/retry`
+
+### Hybrid Dynamic Chunking with Sentence Snap
+
+The chunking algorithm uses **Hybrid Dynamic** approach:
+
+1. **Calculate ideal 5-min positions**: (0:00-5:00), (5:00-10:00), etc.
+2. **Search ±30s for sentence boundary**: For each ideal boundary, search transcript within ±30 seconds for nearest sentence-ending punctuation (`.`, `!`, `?`)
+3. **Snap to sentence boundary**: Adjust chunk end to include the full sentence
+
+**Algorithm:**
+```
+For each ideal boundary at time T:
+  1. Search transcript entries in range [T-30s, T+30s]
+  2. Find sentence-ending punctuation (.!?) nearest to T
+  3. If found within ±30s: extend/shrink chunk to that boundary
+  4. If not found: use ideal boundary T
+```
+
+**Sentence Boundary Detection:**
+- Search within ±30s window for transcript entries with sentence-ending punctuation
+- If found, snap chunk boundary to the sentence end
+- If no boundary in window, use ideal time position
+
+### Checkpoint-Resume Pattern
+
+```python
+class VideoProcessingError(Exception):
+    """Base error with checkpoint information."""
+    def __init__(self, message: str, checkpoint_state: str, failed_step: str):
+        self.message = message
+        self.checkpoint_state = checkpoint_state
+        self.failed_step = failed_step
+
+class VideoService:
+    async def process_video(self, video_id: UUID) -> Video:
+        video = await self.repo.get_by_id(video_id)
+        
+        try:
+            # Step 1: Download
+            if video.status == "pending":
+                await self._update_status(video, "downloading")
+                video.file_path = await self._download(video.youtube_url)
+                await self._update_status(video, "downloading_complete")
+            
+            # Step 2: Chunk
+            if video.status == "downloading_complete":
+                await self._update_status(video, "chunking")
+                chunks = await self._create_chunks_with_snap(video)
+                await self.chunk_repo.create_many(video.id, chunks)
+                await self._update_status(video, "chunking_complete")
+            
+            # Step 3: Transcribe
+            if video.status == "chunking_complete":
+                await self._update_status(video, "transcribing")
+                transcript = await self._transcribe(video.file_path)
+                await self.transcript_repo.create(video.id, transcript)
+                await self._update_status(video, "transcribing_complete")
+            
+            # Step 4: Study Plan
+            if video.status == "transcribing_complete":
+                await self._update_status(video, "studying")
+                study_plan = await self._generate_study_plan(transcript)
+                await self.study_plan_repo.create(video.id, study_plan)
+                await self._update_status(video, "ready")
+            
+            return await self.repo.get_by_id(video_id)
+            
+        except Exception as e:
+            await self._update_status(video, "failed", error_message=str(e))
+            raise
+
+    async def retry_video(self, video_id: UUID) -> Video:
+        """Resume processing from last checkpoint."""
+        video = await self.repo.get_by_id(video_id)
+        if video.status == "ready":
+            return video  # Already complete
+        return await self.process_video(video_id)
+```
+
+### Processing Flow
+
+```
+POST /api/videos/youtube
+↓
+┌─────────────────────────────────────────────────────────────┐
+│ 1. Download (yt-dlp) → MP4/WebM                             │
+│    Checkpoint: "downloading" → "downloading_complete"       │
+└────────┬────────────────────────────────────────────────────┘
+         ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 2. Chunk (Hybrid Dynamic + Sentence Snap)                   │
+│    Checkpoint: "chunking" → "chunking_complete"             │
+└────────┬────────────────────────────────────────────────────┘
+         ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 3. Transcribe (YouTube subtitles first, Whisper fallback)   │
+│    Checkpoint: "transcribing" → "transcribing_complete"     │
+└────────┬────────────────────────────────────────────────────┘
+         ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 4. Study Plan (LLM)                                         │
+│    Checkpoint: "studying" → "ready"                         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### API Endpoints
+
+```python
+# POST /api/videos/youtube - Create and process video (waits for completion)
+# GET /api/videos/{id} - Get video with current status
+# POST /api/videos/{id}/retry - Retry from last checkpoint
+# GET /api/videos/{id}/chunks - Get calculated chunks
+```
+
+### Chunking Service Implementation
+
+```python
+@dataclass
+class VideoChunk:
+    """A virtual video chunk with timestamps and sentence-snap."""
+    index: int
+    start_time: float  # seconds
+    end_time: float    # seconds (snapped to sentence boundary)
+    duration: float    # seconds
+
+class ChunkingService:
+    """
+    Hybrid Dynamic chunking with sentence-aware boundaries.
+    Searches ±30s window for nearest sentence boundary.
+    """
+    
+    SENTENCE_PUNCTUATION = {'.', '!', '?'}
+    SEARCH_WINDOW = 30.0  # ±30 seconds
+
+    async def create_chunks(
+        self,
+        video_duration: float,
+        transcript: List[dict],  # [{"start": 0.0, "end": 5.0, "text": "..."}]
+        chunk_duration: int = 300
+    ) -> List[VideoChunk]:
+        """
+        Create chunks with Hybrid Dynamic sentence-snap.
+        
+        Args:
+            video_duration: Total video duration in seconds
+            transcript: List of transcript entries with text
+            chunk_duration: Target chunk duration (default 300s = 5min)
+        """
+        chunks = []
+        current_time = 0.0
+        chunk_index = 0
+
+        while current_time < video_duration:
+            ideal_end = min(current_time + chunk_duration, video_duration)
+            
+            # Find sentence boundary near ideal_end
+            actual_end = self._find_sentence_boundary(
+                ideal_end, transcript
+            )
+            
+            chunks.append(VideoChunk(
+                index=chunk_index,
+                start_time=current_time,
+                end_time=actual_end,
+                duration=actual_end - current_time
+            ))
+
+            current_time = actual_end
+            chunk_index += 1
+
+        return chunks
+
+    def _find_sentence_boundary(
+        self, 
+        target_time: float, 
+        transcript: List[dict]
+    ) -> float:
+        """Find nearest sentence boundary within ±30s of target_time."""
+        min_search = target_time - self.SEARCH_WINDOW
+        max_search = target_time + self.SEARCH_WINDOW
+        
+        candidates = []
+        for entry in transcript:
+            if entry["start"] < min_search:
+                continue
+            if entry["start"] > max_search:
+                break
+                
+            text = entry.get("text", "")
+            if text and self._ends_with_sentence(text):
+                distance = abs(entry["start"] - target_time)
+                candidates.append((distance, entry["start"]))
+        
+        if candidates:
+            # Return the boundary nearest to target_time
+            candidates.sort(key=lambda x: x[0])
+            return candidates[0][1]
+        
+        return target_time  # No boundary found, use ideal
+
+    def _ends_with_sentence(self, text: str) -> bool:
+        """Check if text ends with sentence-ending punctuation."""
+        text = text.strip()
+        if not text:
+            return False
+        return text[-1] in self.SENTENCE_PUNCTUATION
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │ POST /api/videos/youtube                                    │
@@ -1514,69 +1740,6 @@ def get_cached_model(model_name: str):
 
 ---
 
-## Phase 2 Implementation (Completed)
-
-### Overview
-
-Phase 2 implements the complete video processing pipeline with checkpoint-resume capability.
-
-### Implemented Services
-
-| Service | File | Description |
-|---------|------|-------------|
-| `DownloadService` | `app/services/download_service.py` | YouTube video download using yt-dlp |
-| `ChunkingService` | `app/services/chunking_service.py` | Hybrid Dynamic chunking with ±30s sentence snap |
-| `TranscriptionService` | `app/services/transcription_service.py` | YouTube subtitles first, Whisper fallback |
-| `VideoService` | `app/services/video_service.py` | Orchestrator with state machine |
-
-### State Machine
-
-```
-pending → downloading → downloading_complete → chunking → chunking_complete
-        → transcribing → transcribing_complete → studying → ready
-                                                               ↓
-                                                             failed
-```
-
-Each state transition is checkpointed. If a step fails, the video stays in the last successful state with `error_message` set. User can retry via `POST /api/videos/{id}/retry`.
-
-### Hybrid Dynamic Chunking Algorithm
-
-For each ideal 5-min boundary at time T:
-1. Search transcript entries in range [T-30s, T+30s]
-2. Find sentence-ending punctuation (`.!?`) nearest to T
-3. If found: snap chunk end to that boundary
-4. If not found: use ideal boundary T
-
-### API Endpoints (Phase 2)
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/v1/videos/youtube` | POST | Create video from YouTube URL, process through full pipeline |
-| `/api/v1/videos/{id}` | GET | Get video by ID |
-| `/api/v1/videos/{id}/retry` | POST | Retry processing from last checkpoint |
-| `/api/v1/videos/{id}/chunks` | GET | Get video chunks |
-
-### Database Schema Updates
-
-Added `error_message` field to videos table for checkpoint-resume:
-```sql
-ALTER TABLE videos ADD COLUMN error_message TEXT;
-```
-
-### Test Coverage
-
-| Test Suite | Tests | Status |
-|------------|-------|--------|
-| `test_exceptions.py` | 6 | ✅ |
-| `test_download_service.py` | 4 | ✅ |
-| `test_chunking_service.py` | 7 | ✅ |
-| `test_transcription_service.py` | 5 | ✅ |
-| `test_video_service.py` | 9 | ✅ |
-| **Total** | **31** | **All passing** |
-
----
-
 ## Document History
 
 | Date | Version | Author | Changes |
@@ -1586,8 +1749,7 @@ ALTER TABLE videos ADD COLUMN error_message TEXT;
 | 2025-04-10 | 3.0 | AI Assistant | Removed job queue: all processing immediate async |
 | 2025-04-24 | 4.0 | AI Assistant | Added video/audio format constraints (MP4/WebM, MP3/WebM) |
 | 2025-04-24 | 5.0 | AI Assistant | Removed Auth Service, Exam Service, user references; cleaned up React remnants |
-| 2026-04-26 | 6.0 | AI Assistant | Phase 2 design: Hybrid Dynamic chunking (±30s sentence snap), checkpoint-resume state machine |
-| 2026-04-26 | 7.0 | AI Assistant | Phase 2 implementation complete: DownloadService, ChunkingService, TranscriptionService, VideoService (31 tests passing) |
+| 2026-04-26 | 6.0 | AI Assistant | Phase 2 design: Hybrid Dynamic chunking (±30s sentence snap), checkpoint-resume state machine, error_message field |
 
 ---
 

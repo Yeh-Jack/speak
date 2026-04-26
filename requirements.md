@@ -68,19 +68,20 @@ POST /api/videos/youtube
 
 #### 1.3 Video Chunking with Sentence Snap
 
-**Time-Based with Sentence-Aware Boundaries:**
-- **Duration**: ~5 minutes, snaps to sentence boundaries (head/tail)
-- **Method**: Calculate timestamp segments, align to transcript sentences
+**Hybrid Dynamic Chunking Algorithm:**
+- **Duration**: ~5 minutes (default 300s, user-adjustable 60-600s)
+- **Method**: Calculate ideal 5-min positions, then search ±30s for nearest sentence boundary
+- **Sentence Detection**: Look for `.`, `!`, `?` punctuation in transcript
+- **Snap Behavior**: If sentence boundary found within ±30s of ideal position, extend/shrink chunk to it
 - **Storage**: Keep original video only, use timestamps for navigation
-- **Use Case**: General learning, sequential content with natural breakpoints
-- **Navigation**: Video player seeks to timestamp when changing chunks
-- **Sentence Snap**: Chunks start/end at sentence boundaries from transcript
+- **Error Handling**: Checkpoint-resume - if processing fails, retry from last successful state
 
 **Example:**
-- Target chunk: 0:00-5:00
-- Transcript sentences end at: 0:00-4:58, 4:58-5:03
-- Actual chunk: 0:00-4:58 (snaps to sentence end)
-- Next chunk starts at 4:58
+- Target chunk: 0:00-5:00 (ideal)
+- Search range: 4:30-5:30 for sentence boundary
+- Transcript: sentence ends at 4:52 with `.`
+- Actual chunk: 0:00-4:52 (snaps to sentence)
+- Next chunk: 4:52-9:52 (searches for next boundary)
 
 #### 1.4 Storage Structure
 
@@ -311,13 +312,13 @@ POST /api/chat/stream               # Streaming chat response
 - SQLite schema design (single user, no auth)
 - Basic FastAPI structure
 
-### Phase 2: Video Pipeline ✅ (COMPLETED)
-- YouTube download integration (yt-dlp) ✅
-- **Hybrid Dynamic chunking** with ±30s sentence snap ✅
-- **Checkpoint-resume state machine** for error recovery ✅
-- **Immediate async processing** (no queue) ✅
-- Local storage configuration ✅
-- Video processing states: pending → downloading → downloading_complete → chunking → chunking_complete → transcribing → transcribing_complete → studying → ready (or failed) ✅
+### Phase 2: Video Pipeline (1 week)
+- YouTube download integration (yt-dlp)
+- **Hybrid Dynamic chunking** with ±30s sentence snap
+- **Checkpoint-resume state machine** for error recovery
+- **Immediate async processing** (no queue)
+- Local storage configuration
+- Video processing states: pending → downloading → downloading_complete → chunking → chunking_complete → transcribing → transcribing_complete → studying → ready (or failed)
 
 ### Phase 3: Transcription (1 week)
 - YouTube subtitle extraction (yt-dlp)
