@@ -1,7 +1,7 @@
-"""GPU detection and configuration utilities for NVIDIA and AMD GPUs.
+"""GPU detection and configuration utilities for NVIDIA GPUs.
 
-Supports NVIDIA (CUDA) and AMD (ROCm) GPUs for LLM inference.
-Automatically detects GPU vendor and configures llama-cpp-python backend.
+Supports NVIDIA (CUDA) GPUs for LLM inference.
+Automatically detects GPU and configures llama-cpp-python backend.
 
 Usage:
     from app.utils.gpu_utils import gpu_manager
@@ -17,31 +17,30 @@ Usage:
 """
 
 import logging
-import subprocess
-from enum import Enum
-from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
+from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 class GPUVendor(Enum):
     """GPU vendor types."""
+
     NVIDIA = "nvidia"
-    AMD = "amd"
-    UNKNOWN = "unknown"
 
 
 class GPUBackend(Enum):
     """llama-cpp-python GPU backends."""
-    CUDA = "cuda"        # NVIDIA
-    ROCM = "rocm"        # AMD
-    CPU = "cpu"          # CPU-only
+
+    CUDA = "cuda"  # NVIDIA
+    CPU = "cpu"  # CPU-only
 
 
 @dataclass
 class GPUInfo:
     """GPU information container."""
+
     id: int
     name: str
     vendor: GPUVendor
@@ -49,48 +48,51 @@ class GPUInfo:
     free_memory_mb: float
     used_memory_mb: float
     load_percent: float = 0.0
-    temperature_celsius: Optional[float] = None
-    driver_version: Optional[str] = None
+    temperature_celsius: float | None = None
+    driver_version: str | None = None
     backend: GPUBackend
     is_available: bool = True
 
 
 class GPUManager:
-    """GPU manager for NVIDIA and AMD LLM configuration."""
+    """GPU manager for NVIDIA LLM configuration."""
 
     # VRAM estimates per layer for Q4_K_M quantized models (in MB)
+    # Only models under 6B are supported
     LAYER_MEMORY_ESTIMATES = {
-        "3B": 80,    # Llama 3.2 3B
-        "5B": 100,   # Gemma 4 5B
-        "7B": 150,   # Qwen2.5 7B
-        "8B": 170,   # Gemma 4 8B
+        "0.5B": 35,  # Qwen3.5 0.5B
+        "1.5B": 45,  # Qwen3.5 1.5B
+        "2B": 50,  # Qwen3.5-2B (default model)
+        "3B": 80,  # Llama 3.2 3B, Qwen3.5 3B
+        "4B": 90,  # Gemma 4 4B
+        "5B": 100,  # Gemma 4 5B
     }
 
     # Total layers per model size
     MODEL_LAYERS = {
+        "0.5B": 24,
+        "1.5B": 28,
+        "2B": 28,  # Qwen3.5-2B has 28 layers
         "3B": 28,
+        "4B": 34,
         "5B": 28,
-        "7B": 35,
-        "8B": 36,
     }
 
     # Safety buffer to leave free VRAM (in MB)
     VRAM_SAFETY_BUFFER_MB = 1024
 
     def __init__(self):
-        self._gpus: List[GPUInfo] = []
+        self._gpus: list[GPUInfo] = []
         self._detected_vendors: set = set()
         self._nvidia_available = False
-        self._amd_available = False
 
-    def detect_all_gpus(self) -> List[GPUInfo]:
-        """Detect GPUs from NVIDIA and AMD."""
+    def detect_all_gpus(self) -> list[GPUInfo]:
+        """Detect NVIDIA GPUs."""
         self._gpus = []
         self._detected_vendors.clear()
 
-        # Detect in priority order
+        # Detect NVIDIA GPUs
         self._detect_nvidia()
-        self._detect_amd()
 
         if not self._gpus:
             logger.info("No GPU detected, will use CPU-only mode")
@@ -114,7 +116,7 @@ class GPUManager:
             if not gpus:
                 return False
 
-            for i, gpu in enumerate(gpus):
+            for gpu in gpus:
                 info = GPUInfo(
                     id=len(self._gpus),
                     name=gpu.name,
@@ -122,8 +124,8 @@ class GPUManager:
                     total_memory_mb=gpu.memoryTotal,
                     free_memory_mb=gpu.memoryFree,
                     used_memory_mb=gpu.memoryUsed,
-                    load_percent=gpu.load * 100 if hasattr(gpu, 'load') else 0.0,
-                    temperature_celsius=getattr(gpu, 'temperature', None),
+                    load_percent=gpu.load * 100 if hasattr(gpu, "load") else 0.0,
+                    temperature_celsius=getattr(gpu, "temperature", None),
                     backend=GPUBackend.CUDA,
                 )
                 self._gpus.append(info)
@@ -140,84 +142,7 @@ class GPUManager:
 
         return False
 
-    def _detect_amd(self) -> bool:
-        """Detect AMD GPUs using pyamdgpuinfo or rocm-smi."""
-        # Try pyamdgpuinfo first (Linux only)
-        try:
-            import pyamdgpuinfo
-
-            for device in pyamdgpuinfo.get_devices():
-                info = GPUInfo(
-                    id=len(self._gpus),
-                    name=device.name or "AMD GPU",
-                    vendor=GPUVendor.AMD,
-                    total_memory_mb=device.memory_info.vram_total / (1024**2),
-                    free_memory_mb=device.memory_info.vram_free / (1024**2),
-                    used_memory_mb=(device.memory_info.vram_total - device.memory_info.vram_free) / (1024**2),
-                    backend=GPUBackend.ROCM,
-                )
-                self._gpus.append(info)
-                self._detected_vendors.add(GPUVendor.AMD)
-
-            self._amd_available = True
-            logger.info(f"Detected {len(pyamdgpuinfo.get_devices())} AMD GPU(s) via pyamdgpuinfo")
-            return True
-
-        except ImportError:
-            logger.debug("pyamdgpuinfo not available")
-        except Exception as e:
-            logger.debug(f"pyamdgpuinfo detection failed: {e}")
-
-        # Fallback: try rocm-smi
-        return self._detect_amd_rocm_smi()
-
-    def _detect_amd_rocm_smi(self) -> bool:
-        """Detect AMD GPUs using rocm-smi command."""
-        try:
-            result = subprocess.run(
-                ["rocm-smi", "--showproductname", "--showvram", "--showuse"],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-
-            if result.returncode == 0:
-                return self._parse_rocm_smi(result.stdout)
-        except (subprocess.SubprocessError, FileNotFoundError):
-            logger.debug("rocm-smi not available")
-        except Exception as e:
-            logger.debug(f"rocm-smi detection failed: {e}")
-
-        return False
-
-    def _parse_rocm_smi(self, output: str) -> bool:
-        """Parse rocm-smi output."""
-        lines = output.strip().split('\n')
-        gpu_count = 0
-
-        for line in lines:
-            if 'GPU' in line and 'VRAM' in line:
-                gpu_count += 1
-                info = GPUInfo(
-                    id=len(self._gpus),
-                    name=f"AMD GPU {gpu_count}",
-                    vendor=GPUVendor.AMD,
-                    total_memory_mb=0,
-                    free_memory_mb=0,
-                    used_memory_mb=0,
-                    backend=GPUBackend.ROCM,
-                )
-                self._gpus.append(info)
-                self._detected_vendors.add(GPUVendor.AMD)
-
-        if gpu_count > 0:
-            self._amd_available = True
-            logger.info(f"Detected {gpu_count} AMD GPU(s) via rocm-smi")
-            return True
-
-        return False
-
-    def get_best_gpu(self) -> Optional[GPUInfo]:
+    def get_best_gpu(self) -> GPUInfo | None:
         """Get the best GPU for LLM inference."""
         if not self._gpus:
             self.detect_all_gpus()
@@ -225,26 +150,17 @@ class GPUManager:
         if not self._gpus:
             return None
 
-        # Priority: NVIDIA > AMD
-        priority_map = {
-            GPUVendor.NVIDIA: 2,
-            GPUVendor.AMD: 1,
-            GPUVendor.UNKNOWN: 0,
-        }
-
-        # Sort by priority and free VRAM
+        # Sort by free VRAM (highest first)
         sorted_gpus = sorted(
             self._gpus,
-            key=lambda g: (priority_map.get(g.vendor, 0), g.free_memory_mb),
-            reverse=True
+            key=lambda g: g.free_memory_mb,
+            reverse=True,
         )
 
         return sorted_gpus[0] if sorted_gpus else None
 
     def calculate_optimal_gpu_layers(
-        self,
-        model_size: str = "7B",
-        gpu: Optional[GPUInfo] = None
+        self, model_size: str = "2B", gpu: GPUInfo | None = None
     ) -> int:
         """Calculate optimal GPU layers based on available VRAM."""
         if not gpu:
@@ -258,13 +174,12 @@ class GPUManager:
 
         if available_vram <= 0:
             logger.warning(
-                f"Insufficient VRAM on {gpu.name}: "
-                f"{gpu.free_memory_mb:.0f}MB free. Using CPU-only."
+                f"Insufficient VRAM on {gpu.name}: {gpu.free_memory_mb:.0f}MB free. Using CPU-only."
             )
             return 0
 
-        layer_memory = self.LAYER_MEMORY_ESTIMATES.get(model_size, 150)
-        total_layers = self.MODEL_LAYERS.get(model_size, 35)
+        layer_memory = self.LAYER_MEMORY_ESTIMATES.get(model_size, 50)
+        total_layers = self.MODEL_LAYERS.get(model_size, 28)
 
         max_layers = int(available_vram / layer_memory)
         optimal_layers = min(max_layers, total_layers)
@@ -279,11 +194,8 @@ class GPUManager:
         return optimal_layers
 
     def get_llama_config(
-        self,
-        model_path: str,
-        env_gpu_layers: Optional[str] = None,
-        model_size: str = "7B"
-    ) -> Dict[str, Any]:
+        self, model_path: str, env_gpu_layers: str | None = None, model_size: str = "2B"
+    ) -> dict[str, Any]:
         """
         Get complete llama-cpp-python configuration.
 
@@ -291,7 +203,7 @@ class GPUManager:
             - model_path: str
             - n_gpu_layers: int
             - n_ctx: int
-            - backend: str (cuda/rocm/cpu)
+            - backend: str (cuda/cpu)
         """
         config = {
             "model_path": model_path,
@@ -322,6 +234,7 @@ class GPUManager:
             try:
                 requested = int(env_gpu_layers)
                 available = self.calculate_optimal_gpu_layers(model_size, gpu)
+                total = self.MODEL_LAYERS.get(model_size, 28)
 
                 if requested > available:
                     logger.warning(
@@ -330,7 +243,6 @@ class GPUManager:
                     )
                     layers = available
                 else:
-                    total = self.MODEL_LAYERS.get(model_size, 35)
                     layers = min(requested, total)
             except ValueError:
                 layers = self.calculate_optimal_gpu_layers(model_size, gpu)
@@ -338,14 +250,11 @@ class GPUManager:
         config["n_gpu_layers"] = layers
         config["backend"] = gpu.backend.value
 
-        logger.info(
-            f"LLM Config: {layers} layers on {gpu.name} "
-            f"({gpu.backend.value})"
-        )
+        logger.info(f"LLM Config: {layers} layers on {gpu.name} ({gpu.backend.value})")
 
         return config
 
-    def get_gpu_summary(self) -> Dict[str, Any]:
+    def get_gpu_summary(self) -> dict[str, Any]:
         """Get summary of all detected GPUs."""
         if not self._gpus:
             self.detect_all_gpus()
@@ -363,7 +272,7 @@ class GPUManager:
                     "backend": gpu.backend.value,
                 }
                 for gpu in self._gpus
-            ]
+            ],
         }
 
 
@@ -372,30 +281,28 @@ gpu_manager = GPUManager()
 
 
 # Convenience functions
-def detect_all_gpus() -> List[GPUInfo]:
+def detect_all_gpus() -> list[GPUInfo]:
     """Detect all GPUs."""
     return gpu_manager.detect_all_gpus()
 
 
-def get_best_gpu() -> Optional[GPUInfo]:
+def get_best_gpu() -> GPUInfo | None:
     """Get best GPU for LLM."""
     return gpu_manager.get_best_gpu()
 
 
-def calculate_gpu_layers(model_size: str = "7B") -> int:
+def calculate_gpu_layers(model_size: str = "2B") -> int:
     """Calculate optimal GPU layers."""
     return gpu_manager.calculate_optimal_gpu_layers(model_size)
 
 
 def get_llama_config(
-    model_path: str,
-    env_gpu_layers: Optional[str] = None,
-    model_size: str = "7B"
-) -> Dict[str, Any]:
+    model_path: str, env_gpu_layers: str | None = None, model_size: str = "2B"
+) -> dict[str, Any]:
     """Get llama-cpp-python configuration."""
     return gpu_manager.get_llama_config(model_path, env_gpu_layers, model_size)
 
 
-def get_gpu_summary() -> Dict[str, Any]:
+def get_gpu_summary() -> dict[str, Any]:
     """Get GPU summary."""
     return gpu_manager.get_gpu_summary()

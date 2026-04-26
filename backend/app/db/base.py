@@ -1,7 +1,7 @@
 """SQLAlchemy base class for all models."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import DateTime, String, func

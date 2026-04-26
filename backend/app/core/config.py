@@ -1,48 +1,44 @@
 """Application configuration using Pydantic settings."""
 
+import os
 from pathlib import Path
 from typing import Literal
 
 from pydantic_settings import BaseSettings
 
-# Get project root (parent of backend directory)
-PROJECT_ROOT = Path(__file__).parent.parent.parent
+# Project root is the directory where the application is installed
+# In Docker: PROJECT_ROOT=/app (set via environment variable)
+# In local dev: path/to/education (calculated from file location)
+_env_root = os.getenv("PROJECT_ROOT")
+if _env_root:
+    PROJECT_ROOT = Path(_env_root)
+else:
+    PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 
-
-def get_database_url() -> str:
-    """Get database URL with auto-created data directory."""
-    data_dir = PROJECT_ROOT / "data"
-    data_dir.mkdir(parents=True, exist_ok=True)
-    db_path = data_dir / "learning.db"
-    return f"sqlite+aiosqlite:///{db_path}"
+# Fixed system constants - relative to PROJECT_ROOT
+DATA_DIR = PROJECT_ROOT / "data"
+DATABASE_URL: str = f"sqlite+aiosqlite:///{DATA_DIR}/db/learning.db"
+STORAGE_BASE_PATH: Path = DATA_DIR
+LLM_MODEL_PATH: Path = DATA_DIR / "models"
+SENTENCE_SNAP: bool = True
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
-    # Database - computed absolute path from project root
-    DATABASE_URL: str = get_database_url()
+    # Paths and database are fixed system constants (not configurable)
+    # DATABASE_URL, STORAGE_BASE_PATH, LLM_MODEL_PATH, SENTENCE_SNAP
+    # are defined at module level above
 
-    # Storage - relative to project root, resolved to absolute
-    STORAGE_BASE_PATH: Path = PROJECT_ROOT / "data"
-
-    # LLM Configuration
-    LLM_MODEL_PATH: Path = PROJECT_ROOT / "data" / "shared" / "models"
-    DEFAULT_MODEL: str = "qwen2.5-7b-q4_k_m.gguf"
-    LLM_GPU_LAYERS: str = "-1"  # -1=auto, 0=CPU, N=specific layers
+    DEFAULT_MODEL: str = "Qwen3.5-2B-Q4_K_M.gguf"
+    LLM_GPU_LAYERS: str = "-1"
     LLM_CONTEXT_SIZE: int = 4096
     LLM_THREADS: int = 4
 
-    # JWT
-    JWT_SECRET: str = "your-secret-key-change-in-production"
-    JWT_ALGORITHM: str = "HS256"
-    JWT_EXPIRATION_HOURS: int = 24
-
-    # YouTube Download
     YOUTUBE_DOWNLOAD_QUALITY: int = 720
     YOUTUBE_AUDIO_QUALITY: str = "128k"
+    CHUNK_DURATION: int = 300
 
-    # App Settings
     ENVIRONMENT: Literal["development", "production", "test"] = "development"
     DEBUG: bool = True
     LOG_LEVEL: str = "INFO"
@@ -52,5 +48,4 @@ class Settings(BaseSettings):
         case_sensitive = True
 
 
-# Global settings instance
 settings = Settings()

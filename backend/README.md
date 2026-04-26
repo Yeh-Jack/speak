@@ -7,7 +7,7 @@ FastAPI-based backend for the AI-powered English education platform.
 - JWT-based authentication (email/password)
 - PostgreSQL database with SQLAlchemy async ORM
 - Alembic migrations
-- GPU auto-detection for LLM inference (NVIDIA & AMD)
+- GPU auto-detection for LLM inference (NVIDIA only)
 - Async I/O operations throughout
 
 ## Setup

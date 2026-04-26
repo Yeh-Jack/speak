@@ -33,8 +33,10 @@ User Request → FastAPI → llama-cpp-python (in-backend) → Response
 ```python
 from app.utils.gpu_utils import gpu_manager
 
+from app.core.config import LLM_MODEL_PATH
+
 config = gpu_manager.get_llama_config(
-    model_path="/data/shared/models/Qwen3.5-2B-Q4_K_M.gguf",
+    model_path=str(LLM_MODEL_PATH / "Qwen3.5-2B-Q4_K_M.gguf"),
     env_gpu_layers=os.getenv("LLM_GPU_LAYERS", "-1")
 )
 # Returns: {"n_ctx": 4096, "n_gpu_layers": auto_calculated, "verbose": False}
@@ -48,7 +50,10 @@ from llama_cpp import Llama
 class LLMService:
     """LLM service with fixed Qwen3.5-2B model."""
 
-    def __init__(self, model_path: str = "/data/shared/models/Qwen3.5-2B-Q4_K_M.gguf"):
+    def __init__(self, model_path: str = ""):
+        if not model_path:
+            from app.core.config import LLM_MODEL_PATH
+            model_path = str(LLM_MODEL_PATH / "Qwen3.5-2B-Q4_K_M.gguf")
         self.model_path = model_path
         self._llm: Optional[Llama] = None
 
@@ -271,9 +276,11 @@ GPUtil>=1.4.0
 
 ## Environment Variables
 
+The following are fixed system constants (not configurable via environment):
+- `LLM_MODEL_PATH` - Fixed at `PROJECT_ROOT/data/models` (e.g., `/app/data/models` in Docker)
+
 ```bash
 # LLM (Fixed model - no switching)
-LLM_MODEL_PATH=/data/shared/models
 DEFAULT_MODEL=Qwen3.5-2B-Q4_K_M.gguf
 LLM_GPU_LAYERS=-1  # -1=auto, 0=CPU only, N=specific layers
 LLM_CONTEXT_SIZE=4096
