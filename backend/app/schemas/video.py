@@ -2,8 +2,24 @@
 
 import uuid
 from datetime import datetime
+from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+class VideoProcessState(str, Enum):
+    """Video processing state machine states."""
+
+    PENDING = "pending"
+    DOWNLOADING = "downloading"
+    DOWNLOADING_COMPLETE = "downloading_complete"
+    CHUNKING = "chunking"
+    CHUNKING_COMPLETE = "chunking_complete"
+    TRANSCRIBING = "transcribing"
+    TRANSCRIBING_COMPLETE = "transcribing_complete"
+    STUDYING = "studying"
+    READY = "ready"
+    FAILED = "failed"
 
 
 class VideoChunkBase(BaseModel):
