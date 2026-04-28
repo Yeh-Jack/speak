@@ -32,13 +32,13 @@ class Video(Base, TimestampMixin):
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     chunks: Mapped[list["VideoChunk"]] = relationship(
-        "VideoChunk", back_populates="video", cascade="all, delete-orphan"
+        "VideoChunk", back_populates="video", cascade="all, delete-orphan", lazy="selectin"
     )
     transcripts: Mapped[list["Transcript"]] = relationship(
-        "Transcript", back_populates="video", cascade="all, delete-orphan"
+        "Transcript", back_populates="video", cascade="all, delete-orphan", lazy="selectin"
     )
     study_plans: Mapped[list["StudyPlan"]] = relationship(
-        "StudyPlan", back_populates="video", cascade="all, delete-orphan"
+        "StudyPlan", back_populates="video", cascade="all, delete-orphan", lazy="selectin"
     )
 
     def __repr__(self) -> str:

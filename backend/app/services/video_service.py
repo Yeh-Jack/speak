@@ -100,8 +100,7 @@ class VideoService:
             if video.status == "downloading_complete":
                 await self._update_status(video, "chunking")
                 chunks = await self._create_chunks_with_snap(video)
-                for chunk in chunks:
-                    await self.chunk_repo.create(chunk)
+                await self.chunk_repo.create_many(chunks)
                 await self._update_status(video, "chunking_complete")
 
             if video.status == "chunking_complete":
@@ -166,9 +165,7 @@ class VideoService:
 
     async def _create_chunks_with_snap(self, video: Video) -> List[VideoChunk]:
         """Create chunks with Hybrid Dynamic sentence-snap."""
-        video_path = Path(video.file_path)
-
-        duration = await self.chunking_service.get_video_duration(str(video_path))
+        duration = video.duration
 
         transcript = await self.transcript_repo.get_by_video_id(video.id)
         transcript_data = []

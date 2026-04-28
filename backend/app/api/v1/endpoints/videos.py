@@ -7,7 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
 from app.core.config import DATA_DIR
-from app.repositories import ChunkRepository, VideoRepository
+from app.repositories import (
+    ChunkRepository,
+    StudyPlanRepository,
+    TranscriptRepository,
+    VideoRepository,
+)
 from app.schemas.video import Video, VideoChunk, VideoCreate, VideoUpdate
 from app.services.video_service import VideoService
 from app.services.download_service import DownloadService
@@ -20,8 +25,8 @@ def get_video_service(db: AsyncSession) -> VideoService:
     return VideoService(
         video_repo=VideoRepository(db),
         chunk_repo=ChunkRepository(db),
-        transcript_repo=None,
-        study_plan_repo=None,
+        transcript_repo=TranscriptRepository(db),
+        study_plan_repo=StudyPlanRepository(db),
         storage_dir=DATA_DIR,
     )
 
@@ -93,8 +98,8 @@ async def create_video_from_youtube(
     video_service = VideoService(
         video_repo=video_repo,
         chunk_repo=ChunkRepository(db),
-        transcript_repo=None,
-        study_plan_repo=None,
+        transcript_repo=TranscriptRepository(db),
+        study_plan_repo=StudyPlanRepository(db),
         storage_dir=DATA_DIR,
     )
 
@@ -130,8 +135,8 @@ async def retry_video_processing(
     video_service = VideoService(
         video_repo=video_repo,
         chunk_repo=ChunkRepository(db),
-        transcript_repo=None,
-        study_plan_repo=None,
+        transcript_repo=TranscriptRepository(db),
+        study_plan_repo=StudyPlanRepository(db),
         storage_dir=DATA_DIR,
     )
 

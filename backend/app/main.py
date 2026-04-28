@@ -2,12 +2,15 @@
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.api.v1.router import api_router
-from app.core.config import settings
+from app.core.config import DATA_DIR, DATABASE_URL, settings
 
 # Configure logging
 logging.basicConfig(
@@ -17,11 +20,45 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _ensure_data_directories() -> None:
+    """Ensure all data storage directories exist."""
+    subdirs = ["db", "videos", "transcripts", "audios", "models"]
+    for subdir in subdirs:
+        dir_path = DATA_DIR / subdir
+        dir_path.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Data directory ensured: {dir_path}")
+
+
+async def _ensure_database() -> None:
+    """Ensure database exists and has tables created via SQLAlchemy."""
+    from app.db.base import Base
+    import app.models  # noqa: F401 - Import to register models with Base.metadata
+
+    engine = create_async_engine(DATABASE_URL, echo=False, future=True)
+
+    async with engine.connect() as conn:
+        await conn.execute(text("PRAGMA foreign_keys = ON"))
+        await conn.execute(text("PRAGMA journal_mode = WAL"))
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    await engine.dispose()
+    logger.info(f"Database ensured: {DATA_DIR}/db/learning.db")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan context manager for startup/shutdown events."""
     # Startup
     logger.info("Starting up English Learning API")
+
+    # Ensure data directories exist
+    _ensure_data_directories()
+
+    # Ensure database exists with tables
+    await _ensure_database()
+
     try:
         yield
     except Exception as e:

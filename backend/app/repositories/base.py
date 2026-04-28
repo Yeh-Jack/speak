@@ -56,7 +56,7 @@ class BaseRepository(ABC, Generic[T]):
 
     async def save(self, entity: T) -> T:
         """Save an entity (create or update)."""
-        await self.session.save(entity)
+        self.session.add(entity)
         await self.session.flush()
         await self.session.refresh(entity)
         return entity
