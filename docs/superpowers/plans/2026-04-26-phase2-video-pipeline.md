@@ -268,9 +268,7 @@ class DownloadService:
         logger.info(f"Downloading video {video_id} from {youtube_url}")
 
         try:
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(
-                None,
+            await asyncio.to_thread(
                 self._download_sync,
                 youtube_url,
                 str(output_path)
@@ -309,9 +307,7 @@ class DownloadService:
             Dict with video metadata (title, duration, etc.)
         """
         try:
-            loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(
-                None,
+            return await asyncio.to_thread(
                 self._get_info_sync,
                 youtube_url
             )
@@ -912,9 +908,7 @@ class WhisperTranscriptionService:
         """
         self._load_model()
 
-        loop = asyncio.get_event_loop()
-        segments, info = await loop.run_in_executor(
-            None,
+        segments, info = await asyncio.to_thread(
             lambda: self._model.transcribe(
                 str(audio_path),
                 language=language,

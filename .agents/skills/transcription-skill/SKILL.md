@@ -112,11 +112,7 @@ class WhisperTranscriptionService:
         """
         Transcribe audio file with word-level timestamps.
         """
-        loop = asyncio.get_event_loop()
-
-        # Run in thread pool to avoid blocking
-        segments, info = await loop.run_in_executor(
-            self.executor,
+        segments, info = await asyncio.to_thread(
             lambda: self.model.transcribe(
                 str(audio_path),
                 language=language,
@@ -232,17 +228,12 @@ class SpeakerDiarizationService:
             min_speakers: Minimum number of speakers
             max_speakers: Maximum number of speakers
         """
-        loop = asyncio.get_event_loop()
-
-        # Run in thread pool (pyannote is not async)
-        diarization = await loop.run_in_executor(
-            self.executor,
-            lambda: self.pipeline(
-                str(audio_path),
-                num_speakers=num_speakers,
-                min_speakers=min_speakers,
-                max_speakers=max_speakers
-            )
+        diarization = await asyncio.to_thread(
+            self.pipeline,
+            str(audio_path),
+            num_speakers=num_speakers,
+            min_speakers=min_speakers,
+            max_speakers=max_speakers
         )
 
         results = []

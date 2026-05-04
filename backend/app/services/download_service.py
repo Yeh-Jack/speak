@@ -38,8 +38,7 @@ class DownloadService:
         logger.info(f"Downloading video {video_id} from {youtube_url}")
 
         try:
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, self._download_sync, youtube_url, str(output_path))
+            await asyncio.to_thread(self._download_sync, youtube_url, str(output_path))
         except Exception as e:
             logger.error(f"Download failed for {video_id}: {e}")
             raise DownloadError(f"Failed to download video: {e}")
@@ -73,8 +72,7 @@ class DownloadService:
             Dict with video metadata (title, duration, etc.)
         """
         try:
-            loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(None, self._get_info_sync, youtube_url)
+            return await asyncio.to_thread(self._get_info_sync, youtube_url)
         except Exception as e:
             logger.error(f"Failed to get video info: {e}")
             return {"title": "Unknown", "duration": 0.0}

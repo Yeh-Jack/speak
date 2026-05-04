@@ -95,9 +95,7 @@ class WhisperTranscriptionService:
         """
         self._load_model()
 
-        loop = asyncio.get_event_loop()
-        segments, info = await loop.run_in_executor(
-            None,
+        segments, info = await asyncio.to_thread(
             lambda: self._model.transcribe(
                 str(audio_path),
                 language=language,
