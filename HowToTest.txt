@@ -1,0 +1,61 @@
+cd /workspaces/education/backend
+
+# 1. Run tests.
+uv run pytest tests/unit/ -v
+
+# 2. Start the backend server.
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# 3. Get video information
+curl -X POST http://localhost:8000/api/v1/videos/info \
+  -H "Content-Type: application/json" \
+  -d '{"youtube_url": "https://www.youtube.com/watch?v=SPGn9MZb1a0"}'
+
+# 4. Create video from YouTube (test with a short video)
+curl -X POST http://localhost:8000/api/v1/videos/youtube \
+  -H "Content-Type: application/json" \
+  -d '{"youtube_url": "https://www.youtube.com/watch?v=SPGn9MZb1a0", "chunk_duration": 30}'
+
+# 5. List videos
+curl http://localhost:8000/api/v1/videos
+
+# 6. Delete video
+curl -X DELETE http://localhost:8000/api/v1/videos/{video_id}} \
+  -H "Content-Type: application/json"
+
+This will:
+1. Download the video
+2. Create sentence-snapped chunks
+3. Generate transcript
+4. Return the complete video object
+
+# 5. Check video status
+curl http://localhost:8000/api/v1/videos/{video_id}
+
+# 6. Get video chunks
+curl http://localhost:8000/api/v1/videos/{video_id}/chunks
+
+# 7. Test retry endpoint (simulate failure recovery)
+curl -X POST http://localhost:8000/api/v1/videos/{video_id}/retry
+
+# 8. Verify Storage Files
+ls -la /workspaces/education/data/videos/      # Downloaded video (.webm)
+ls -la /workspaces/education/data/transcripts/ # JSON transcript
+ls -la /workspaces/education/data/audios/      # Temp audio (deleted after Whisper)
+
+# 9. Test Error Handling
+Submit invalid YouTube URL
+curl -X POST http://localhost:8000/api/v1/videos/youtube \
+  -H "Content-Type: application/json" \
+  -d '{"youtube_url": "https://invalid-url.com/video"}'
+Check that status is failed and error_message is set:
+{"status": "failed", "error_message": "..."}
+
+# 10. Retry failed video
+curl -X POST http://localhost:8000/api/v1/videos/{video_id}/retry
+
+# 11. Database Verification
+Check video status and error_message field:
+cd /workspaces/education
+sqlite3 data/db/learning.db "SELECT id, title, status, error_message FROM videos;"
+

@@ -87,7 +87,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include API router
+# Include API routers (courses and videos)
 app.include_router(api_router, prefix="/api/v1")
 
 

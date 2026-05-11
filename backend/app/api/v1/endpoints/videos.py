@@ -13,7 +13,7 @@ from app.repositories import (
     TranscriptRepository,
     VideoRepository,
 )
-from app.schemas.video import Video, VideoChunk, VideoCreate, VideoUpdate
+from app.schemas.video import Video, VideoChunk, VideoCreate, VideoInfoResponse, VideoUpdate
 from app.services.video_service import VideoService
 from app.services.download_service import DownloadService
 
@@ -55,6 +55,36 @@ async def get_video(
     return video
 
 
+@router.post("/info", response_model=VideoInfoResponse)
+async def get_video_info(
+    video_data: VideoCreate,
+):
+    """Get metadata of a video from YouTube URL without DB operations."""
+    download_service = DownloadService(DATA_DIR)
+    try:
+        info = await download_service.get_video_info(video_data.youtube_url)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Failed to get video info: {e}")
+
+    return VideoInfoResponse(
+        youtube_url=video_data.youtube_url,
+        title=info.get("title"),
+        description=info.get("description"),
+        duration=info.get("duration"),
+        thumbnail=info.get("thumbnail"),
+        uploader=info.get("uploader"),
+        upload_date=info.get("upload_date"),
+        view_count=info.get("view_count"),
+        like_count=info.get("like_count"),
+        categories=info.get("categories"),
+        tags=info.get("tags"),
+        language=info.get("language"),
+        subtitles=info.get("subtitles", []),
+        automatic_captions=info.get("automatic_captions", []),
+        available_formats=info.get("available_formats", []),
+    )
+
+
 @router.post("/youtube", response_model=Video, status_code=status.HTTP_201_CREATED)
 async def create_video_from_youtube(
     video_data: VideoCreate,
@@ -91,7 +121,7 @@ async def create_video_from_youtube(
         youtube_url=video_data.youtube_url,
         source_type="youtube",
         chunk_duration=video_data.chunk_duration,
-        status="pending",
+        status="pending",  # 'pending' means waiting for download
     )
     video = await video_repo.create(video)
 
@@ -146,7 +176,8 @@ async def retry_video_processing(
     except Exception as e:
         video = await video_repo.get_by_id(video_id)
         raise HTTPException(
-            status_code=500, detail=f"Video retry failed: {str(e)}. Video status: {video.status}"
+            status_code=500,
+            detail=f"Video retry failed: {str(e)}. Video status: {video.status}",
         )
 
 

@@ -56,7 +56,9 @@ class VideoService:
         self.study_plan_repo = study_plan_repo
         self.download_service = download_service or DownloadService(storage_dir)
         self.chunking_service = chunking_service or ChunkingService()
-        self.transcription_service = transcription_service or TranscriptionService(storage_dir)
+        self.transcription_service = transcription_service or TranscriptionService(
+            storage_dir
+        )
 
     async def process_video(self, video_id: UUID) -> Video:
         """Process video through full pipeline with checkpoint-resume.
@@ -84,15 +86,17 @@ class VideoService:
                 failed_step="lookup",
             )
 
-        logger.info(f"Starting video processing for {video_id}, current status: {video.status}")
+        logger.info(
+            f"Starting video processing for {video_id}, current status: {video.status}"
+        )
 
         try:
             if video.status == "pending":
                 await self._update_status(video, "downloading")
-                video.file_path = str(
-                    await self.download_service.download_video(video.youtube_url, str(video_id))
+                info = await self.download_service.download_video(
+                    video.youtube_url, str(video_id)
                 )
-                info = await self.download_service.get_video_info(video.youtube_url)
+                video.file_path = str(info.output_path)
                 video.title = info.get("title", video.title)
                 video.duration = info.get("duration", 0.0)
                 await self._update_status(video, "downloading_complete")
@@ -170,7 +174,9 @@ class VideoService:
         transcript = await self.transcript_repo.get_by_video_id(video.id)
         transcript_data = []
         if transcript:
-            transcript_data = transcript.segments if hasattr(transcript, "segments") else []
+            transcript_data = (
+                transcript.segments if hasattr(transcript, "segments") else []
+            )
 
         chunk_models = await self.chunking_service.create_chunks(
             video_duration=duration,
