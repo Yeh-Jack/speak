@@ -93,7 +93,9 @@ async def get_video_info(
     )
 
 
-@router.post("/youtube", response_model=VideoResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/youtube", response_model=VideoResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_video_from_youtube(
     video_data: VideoCreate,
     db: AsyncSession = Depends(get_db),
@@ -113,7 +115,9 @@ async def create_video_from_youtube(
 
     existing = await video_repo.get_by_youtube_url(video_data.youtube_url)
     if existing:
-        raise HTTPException(status_code=400, detail="Video from this URL already exists")
+        raise HTTPException(
+            status_code=400, detail="Video from this URL already exists"
+        )
 
     download_service = DownloadService(DATA_DIR)
     try:
@@ -235,11 +239,35 @@ async def delete_video(
     video_id: UUID,
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete a video."""
+    """Delete a video and all associated files."""
     repo = VideoRepository(db)
-    success = await repo.delete(video_id)
-    if not success:
+    video = await repo.get_by_id(video_id)
+    if not video:
         raise HTTPException(status_code=404, detail="Video not found")
+
+    video_id_str = str(video_id)
+
+    for ext in ["webm", "mp4"]:
+        video_file = DATA_DIR / "videos" / f"{video_id_str}.{ext}"
+        if video_file.exists():
+            video_file.unlink()
+
+    for lang in ["en", "zh", "ja", "es", "fr", "de"]:
+        for ext in ["json3", "vtt", "srt", "ass", "lrc"]:
+            subtitle_file = DATA_DIR / "subtitles" / f"{video_id_str}.{lang}.{ext}"
+            if subtitle_file.exists():
+                subtitle_file.unlink()
+
+    transcript_file = DATA_DIR / "transcripts" / f"{video_id_str}.json"
+    if transcript_file.exists():
+        transcript_file.unlink()
+
+    for audio_ext in ["mp3", "wav", "m4a", "ogg"]:
+        audio_file = DATA_DIR / "audios" / f"{video_id_str}.{audio_ext}"
+        if audio_file.exists():
+            audio_file.unlink()
+
+    await repo.delete(video_id)
 
 
 @router.get("/{video_id}/chunks", response_model=list[VideoChunk])
