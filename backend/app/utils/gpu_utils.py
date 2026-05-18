@@ -16,12 +16,13 @@ Usage:
     config = gpu_manager.get_llama_config("/path/to/model.gguf")
 """
 
-import logging
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
-logger = logging.getLogger(__name__)
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class GPUVendor(Enum):

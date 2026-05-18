@@ -2,8 +2,24 @@
 
 import uuid
 from datetime import datetime
+from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+class VideoProcessState(str, Enum):
+    """Video processing state machine states."""
+
+    PENDING = "pending"
+    DOWNLOADING = "downloading"
+    DOWNLOADING_COMPLETE = "downloading_complete"
+    CHUNKING = "chunking"
+    CHUNKING_COMPLETE = "chunking_complete"
+    TRANSCRIBING = "transcribing"
+    TRANSCRIBING_COMPLETE = "transcribing_complete"
+    STUDYING = "studying"
+    READY = "ready"
+    FAILED = "failed"
 
 
 class VideoChunkBase(BaseModel):
@@ -47,14 +63,14 @@ class VideoBase(BaseModel):
     title: str = Field(..., max_length=500)
     description: str | None = None
     youtube_url: str
-    chunk_duration: float = Field(default=300.0, ge=60, le=600)
+    chunk_duration: float = Field(default=300.0, ge=30, le=600)
 
 
 class VideoCreate(BaseModel):
     """Schema for creating a video from YouTube URL."""
 
     youtube_url: str = Field(..., min_length=10)
-    chunk_duration: float = Field(default=300.0, ge=60, le=600)
+    chunk_duration: float = Field(default=300.0, ge=30, le=600)
 
     @field_validator("youtube_url")
     @classmethod
@@ -87,6 +103,17 @@ class Video(VideoBase):
     updated_at: datetime
 
 
+class ProcessingTimings(BaseModel):
+    """Elapsed time metrics for video processing stages."""
+
+    download_seconds: float = 0.0
+    transcription_seconds: float = 0.0
+    chunking_seconds: float = 0.0
+    study_plan_seconds: float = 0.0
+    total_seconds: float = 0.0
+    stages_completed: list[str] = []
+
+
 class VideoResponse(BaseModel):
     """Complete video response with all data."""
 
@@ -94,3 +121,36 @@ class VideoResponse(BaseModel):
     chunks: list[VideoChunk]
     transcript: dict | None = None
     study_plan: dict | None = None
+    timings: ProcessingTimings | None = None
+
+
+class VideoFormatInfo(BaseModel):
+    """Video format information."""
+
+    format_id: str | None = None
+    ext: str | None = None
+    resolution: str | None = None
+    filesize: int | None = None
+    fps: float | None = None
+    vcodec: str | None = None
+    acodec: str | None = None
+
+
+class VideoInfoResponse(BaseModel):
+    """Video metadata response without DB operations."""
+
+    youtube_url: str
+    title: str | None = None
+    description: str | None = None
+    duration: float | None = None
+    thumbnail: str | None = None
+    uploader: str | None = None
+    upload_date: str | None = None
+    view_count: int | None = None
+    like_count: int | None = None
+    categories: list[str] | None = None
+    tags: list[str] | None = None
+    language: str | None = None
+    subtitles: list[str] = []
+    automatic_captions: list[str] = []
+    available_formats: list[VideoFormatInfo] = []

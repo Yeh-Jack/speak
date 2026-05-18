@@ -4,18 +4,29 @@ FastAPI-based backend for the AI-powered English education platform.
 
 ## Features
 
-- JWT-based authentication (email/password)
-- PostgreSQL database with SQLAlchemy async ORM
+- **Single-user application** - no authentication required
+- SQLite database with SQLAlchemy async ORM (learning.db)
 - Alembic migrations
-- GPU auto-detection for LLM inference (NVIDIA only)
+- GPU auto-detection for LLM inference (NVIDIA only, with CPU fallback)
 - Async I/O operations throughout
+- Video processing pipeline: YouTube download → chunk → transcribe → study plan
+- **Hybrid Dynamic chunking** with ±30s sentence boundary snap
+- **Checkpoint-resume** for video processing errors
+
+## Tech Stack
+
+- FastAPI + Python 3.13+ + uv
+- SQLite3 (single file: data/db/learning.db)
+- llama-cpp-python (Qwen3.5-2B-Q4_K_M.gguf)
+- yt-dlp + FFmpeg (video processing)
+- faster-whisper (transcription fallback)
 
 ## Setup
 
 ### Prerequisites
 
 - Python 3.13+
-- PostgreSQL 16
+- FFmpeg
 - Docker & Docker Compose (optional)
 
 ### Development Setup
@@ -55,10 +66,34 @@ docker-compose logs -f
 docker-compose exec backend uv run alembic upgrade head
 ```
 
+## Data Storage
+
+Data is stored under `data/`:
+- `data/db/learning.db` - SQLite database
+- `data/videos/` - Downloaded YouTube videos
+- `data/models/` - LLM model files (Qwen3.5-2B-Q4_K_M.gguf)
+- `data/transcripts/` - JSON transcripts
+- `data/audios/` - Extracted audio for Whisper
+
+In Docker: PROJECT_ROOT is `/app`, so data is at `/app/data/`
+
 ## API Documentation
 
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
+
+## Video Processing States
+
+The video processing pipeline uses a state machine:
+```
+pending → downloading → downloading_complete → chunking → chunking_complete
+→ transcribing → transcribing_complete → studying → ready
+                                                         ↓
+                                                       failed
+```
+
+On failure, the video remains in the last successful state with `error_message` set.
+Use `POST /api/videos/{id}/retry` to resume from the checkpoint.
 
 ## Database Migrations
 

@@ -447,3 +447,4 @@ cypress/downloads/
 # Playwright
 playwright-report/
 test-results/
+.worktrees/

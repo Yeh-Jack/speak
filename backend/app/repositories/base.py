@@ -1,5 +1,6 @@
 """Base repository with common CRUD operations."""
 
+import uuid
 from abc import ABC
 from typing import Any, Generic, TypeVar
 
@@ -18,12 +19,18 @@ class BaseRepository(ABC, Generic[T]):
 
     async def get_by_id(self, id: Any) -> T | None:
         """Get entity by ID."""
-        result = await self.session.execute(select(self.model).where(self.model.id == id))
+        if isinstance(id, uuid.UUID):
+            id = str(id)
+        result = await self.session.execute(
+            select(self.model).where(self.model.id == id)
+        )
         return result.scalar_one_or_none()
 
     async def get_all(self, skip: int = 0, limit: int = 100) -> list[T]:
         """Get all entities with pagination."""
-        result = await self.session.execute(select(self.model).offset(skip).limit(limit))
+        result = await self.session.execute(
+            select(self.model).offset(skip).limit(limit)
+        )
         return list(result.scalars().all())
 
     async def create(self, entity: T) -> T:
@@ -56,7 +63,7 @@ class BaseRepository(ABC, Generic[T]):
 
     async def save(self, entity: T) -> T:
         """Save an entity (create or update)."""
-        await self.session.save(entity)
+        self.session.add(entity)
         await self.session.flush()
         await self.session.refresh(entity)
         return entity

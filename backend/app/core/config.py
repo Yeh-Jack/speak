@@ -20,6 +20,7 @@ DATA_DIR = PROJECT_ROOT / "data"
 DATABASE_URL: str = f"sqlite+aiosqlite:///{DATA_DIR}/db/learning.db"
 STORAGE_BASE_PATH: Path = DATA_DIR
 LLM_MODEL_PATH: Path = DATA_DIR / "models"
+SUBTITLES_DIR: Path = DATA_DIR / "subtitles"
 SENTENCE_SNAP: bool = True
 
 
