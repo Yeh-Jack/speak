@@ -6,8 +6,8 @@ RUN \
     rm -rf /var/lib/apt/lists/* && \
 # Install uv
     curl -LsSf https://astral.sh/uv/install.sh | sh && \
-    # Create data directories for audio, courses, SQLite, models, transcripts and videos.
-    mkdir -p /app/data/{audio,courses,db,models,transcripts,videos}
+# Create data directories for audio, courses, SQLite, models, subtitles, transcripts and videos.
+    mkdir -p /app/data/{audio,courses,db,models,subtitles,transcripts,videos}
 
 ENV PATH="/root/.cargo/bin:${PATH}"
 ENV PROJECT_ROOT=/app

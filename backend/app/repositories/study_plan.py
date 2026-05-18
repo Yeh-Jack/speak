@@ -37,3 +37,20 @@ class StudyPlanRepository(BaseRepository[StudyPlan]):
             select(StudyPlan).where(StudyPlan.video_id == video_id).order_by(StudyPlan.chunk_index)
         )
         return list(result.scalars().all())
+
+    async def create(self, video_id: UUID, study_plan_data: dict) -> StudyPlan:
+        """Create a study plan for a video."""
+        study_plan = StudyPlan(
+            video_id=str(video_id),
+            chunk_index=None,
+            objectives=study_plan_data.get("objectives", []),
+            vocabulary=study_plan_data.get("vocabulary", []),
+            grammar=study_plan_data.get("grammar", []),
+            notes=study_plan_data.get("notes"),
+            overall_difficulty=study_plan_data.get("overall_difficulty"),
+            estimated_time=study_plan_data.get("estimated_time"),
+        )
+        self.session.add(study_plan)
+        await self.session.flush()
+        await self.session.refresh(study_plan)
+        return study_plan

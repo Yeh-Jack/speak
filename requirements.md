@@ -56,31 +56,37 @@ An AI-powered English education platform using LLM as a personalized teacher. **
 ```
 POST /api/videos/youtube
 ↓
-1. Download YouTube video (yt-dlp) - async I/O
-2. Segment video (calculate timestamps, ~5-min with sentence snap) - async
-3. Snap to sentence boundaries - align chunks to transcript sentence head/tail
-4. Extract/Generate subtitles (yt-dlp or Whisper) - async
-5. Generate study plan (LLM) - async
-6. Return complete video object with all data
+1. Download YouTube video + auto-generated subtitles (yt-dlp) - async I/O
+   Subtitles saved to subtitles/ folder
+2. Transcribe (Whisper - always, regardless of YouTube subtitles)
+   Uses subtitles as basis for transcript
+3. Segment video (calculate timestamps, ~5-min with sentence snap) - async
+   Uses transcript for sentence-aware chunk boundaries
+4. Generate study plan (LLM) - async
+5. Return complete video object with all data
 ```
 
 **API Behavior**: The endpoint waits for ALL processing to complete before returning. Frontend shows loading state.
 
+**Key Design**: Transcription happens BEFORE chunking to enable sentence-aware chunk boundary detection.
+
 #### 1.3 Video Chunking with Sentence Snap
 
-**Time-Based with Sentence-Aware Boundaries:**
-- **Duration**: ~5 minutes, snaps to sentence boundaries (head/tail)
-- **Method**: Calculate timestamp segments, align to transcript sentences
+**Hybrid Dynamic Chunking Algorithm:**
+- **Duration**: ~5 minutes (default 300s, user-adjustable 60-600s)
+- **Method**: Calculate ideal 5-min positions, then search ±30s for nearest sentence boundary
+- **Prerequisite**: Transcript must be generated FIRST (from downloaded subtitles)
+- **Sentence Detection**: Look for `.`, `!`, `?` punctuation in transcript
+- **Snap Behavior**: If sentence boundary found within ±30s of ideal position, extend/shrink chunk to it
 - **Storage**: Keep original video only, use timestamps for navigation
-- **Use Case**: General learning, sequential content with natural breakpoints
-- **Navigation**: Video player seeks to timestamp when changing chunks
-- **Sentence Snap**: Chunks start/end at sentence boundaries from transcript
+- **Error Handling**: Checkpoint-resume - if processing fails, retry from last successful state
 
 **Example:**
-- Target chunk: 0:00-5:00
-- Transcript sentences end at: 0:00-4:58, 4:58-5:03
-- Actual chunk: 0:00-4:58 (snaps to sentence end)
-- Next chunk starts at 4:58
+- Target chunk: 0:00-5:00 (ideal)
+- Search range: 4:30-5:30 for sentence boundary
+- Transcript: sentence ends at 4:52 with `.`
+- Actual chunk: 0:00-4:52 (snaps to sentence)
+- Next chunk: 4:52-9:52 (searches for next boundary)
 
 #### 1.4 Storage Structure
 
@@ -92,6 +98,7 @@ PROJECT_ROOT/data/
 │   └── learning.db     # SQLite database file
 ├── models/             # LLM model files (Qwen3.5-2B-Q4_K_M.gguf)
 ├── videos/             # Downloaded from YouTube (original file)
+├── subtitles/          # Downloaded auto-generated subtitles (.json3, .vtt, .srt, .ass, .lrc)
 ├── transcripts/        # JSON (YouTube subtitles or Whisper output)
 ├── audios/             # Extracted audio for Whisper
 └── courses/            # Course data
@@ -106,9 +113,11 @@ In Docker: PROJECT_ROOT is `/app`, so data is at `/app/data/`
 ### 2. Subtitle/Transcript Processing
 
 #### 2.1 Subtitle/Transcript Strategy
-- **YouTube subtitles first**: Extract auto-generated subtitles via yt-dlp
-- **Whisper fallback**: If YouTube subtitles unavailable or insufficient, transcribe using faster-whisper
-- Sentence tokenization for chunk boundary alignment
+- **Simultaneous download**: Video and auto-generated subtitles downloaded together via yt-dlp (for reference/supplement only)
+- **Subtitles storage**: Saved to `subtitles/` folder with language suffix (e.g., `video_id.en.json3`)
+- **Always use Whisper**: Transcription is always done via Whisper, regardless of YouTube subtitles availability
+- **YouTube subtitles**: Downloaded but only used as supplementary reference, NOT for transcription (accuracy not guaranteed)
+- **Transcribe before chunk**: Transcript is generated first, then used for sentence-aware chunk boundary detection
 
 ---
 
@@ -313,9 +322,11 @@ POST /api/chat/stream               # Streaming chat response
 
 ### Phase 2: Video Pipeline (1 week)
 - YouTube download integration (yt-dlp)
-- FFmpeg chunking with sentence snap
+- **Hybrid Dynamic chunking** with ±30s sentence snap
+- **Checkpoint-resume state machine** for error recovery
 - **Immediate async processing** (no queue)
 - Local storage configuration
+- Video processing states: pending → downloading → downloading_complete → chunking → chunking_complete → transcribing → transcribing_complete → studying → ready (or failed)
 
 ### Phase 3: Transcription (1 week)
 - YouTube subtitle extraction (yt-dlp)
@@ -395,7 +406,7 @@ POST /api/chat/stream               # Streaming chat response
 - [ ] Users can submit YouTube URLs
 - [ ] System processes videos immediately (download → chunk with sentence snap → transcribe → study plan)
 - [ ] Videos chunked into ~5-minute segments with sentence boundaries
-- [ ] Subtitles extracted from YouTube first, Whisper fallback if unavailable
+- [ ] Transcriptions generated via Whisper (always, regardless of YouTube subtitles)
 - [ ] Users can create courses with multiple videos
 - [ ] LLM generates study plans immediately during video creation
 - [ ] Resume functionality (5 sec or 3 sentences back)

@@ -1,28 +1,27 @@
 """Database session management."""
 
-from sqlalchemy import text
+from sqlalchemy import text, event
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.core.config import DATABASE_URL, settings
+from app.core.logging import get_logger, is_verbose
 
-# Create async engine with SQLite-specific settings
-engine = create_async_engine(
-    DATABASE_URL,
-    echo=settings.DEBUG,
-    future=True,
-)
+logger = get_logger(__name__)
+
+_engine_options = {"future": True}
+if is_verbose():
+    _engine_options["echo"] = True
+
+engine = create_async_engine(DATABASE_URL, **_engine_options)
 
 
 async def init_sqlite_pragmas():
     """Initialize SQLite pragmas for better performance and foreign key support."""
     async with engine.connect() as conn:
-        # Enable foreign key constraints (SQLite disables them by default)
         await conn.execute(text("PRAGMA foreign_keys = ON"))
-        # Use WAL mode for better concurrent access
         await conn.execute(text("PRAGMA journal_mode = WAL"))
 
 
-# Create async session factory
 AsyncSessionLocal = async_sessionmaker(
     engine,
     expire_on_commit=False,
@@ -38,3 +37,11 @@ async def get_db():
             yield session
         finally:
             await session.close()
+
+
+@event.listens_for(engine.sync_engine, "before_cursor_execute")
+def log_query(conn, cursor, statement, parameters, context, executemany):
+    """Log SQL queries at debug level before execution."""
+    logger.debug(f"SQL: {statement}")
+    if parameters:
+        logger.debug(f"Params: {parameters}")

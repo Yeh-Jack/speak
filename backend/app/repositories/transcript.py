@@ -28,3 +28,17 @@ class TranscriptRepository(BaseRepository[Transcript]):
             select(Transcript).where(Transcript.video_id == video_id, Transcript.source == source)
         )
         return result.scalar_one_or_none()
+
+    async def create(self, video_id: UUID, transcript_data: dict) -> Transcript:
+        """Create a transcript for a video."""
+        transcript = Transcript(
+            video_id=str(video_id),
+            source=transcript_data.get("language", "youtube"),
+            segments=transcript_data.get("segments", []),
+            full_text=transcript_data.get("full_text"),
+            language=transcript_data.get("language"),
+        )
+        self.session.add(transcript)
+        await self.session.flush()
+        await self.session.refresh(transcript)
+        return transcript

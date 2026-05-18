@@ -1,4 +1,4 @@
-"""Video endpoints."""
+"""Video endpoints with full processing pipeline."""
 
 from uuid import UUID
 
@@ -6,10 +6,37 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
-from app.repositories import ChunkRepository, VideoRepository
-from app.schemas.video import Video, VideoChunk, VideoCreate, VideoUpdate
+from app.core.config import DATA_DIR
+from app.repositories import (
+    ChunkRepository,
+    StudyPlanRepository,
+    TranscriptRepository,
+    VideoRepository,
+)
+from app.schemas.video import (
+    Video,
+    VideoChunk,
+    VideoCreate,
+    VideoInfoResponse,
+    VideoUpdate,
+    VideoResponse,
+    ProcessingTimings,
+)
+from app.services.video_service import VideoService
+from app.services.download_service import DownloadService
 
 router = APIRouter()
+
+
+def get_video_service(db: AsyncSession) -> VideoService:
+    """Dependency for VideoService."""
+    return VideoService(
+        video_repo=VideoRepository(db),
+        chunk_repo=ChunkRepository(db),
+        transcript_repo=TranscriptRepository(db),
+        study_plan_repo=StudyPlanRepository(db),
+        storage_dir=DATA_DIR,
+    )
 
 
 @router.get("", response_model=list[Video])
@@ -36,34 +63,156 @@ async def get_video(
     return video
 
 
-@router.post("", response_model=Video, status_code=status.HTTP_201_CREATED)
-async def create_video(
+@router.post("/info", response_model=VideoInfoResponse)
+async def get_video_info(
+    video_data: VideoCreate,
+):
+    """Get metadata of a video from YouTube URL without DB operations."""
+    download_service = DownloadService(DATA_DIR)
+    try:
+        info = await download_service.get_video_info(video_data.youtube_url)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Failed to get video info: {e}")
+
+    return VideoInfoResponse(
+        youtube_url=video_data.youtube_url,
+        title=info.get("title"),
+        description=info.get("description"),
+        duration=info.get("duration"),
+        thumbnail=info.get("thumbnail"),
+        uploader=info.get("uploader"),
+        upload_date=info.get("upload_date"),
+        view_count=info.get("view_count"),
+        like_count=info.get("like_count"),
+        categories=info.get("categories"),
+        tags=info.get("tags"),
+        language=info.get("language"),
+        subtitles=info.get("subtitles", []),
+        automatic_captions=info.get("automatic_captions", []),
+        available_formats=info.get("available_formats", []),
+    )
+
+
+@router.post(
+    "/youtube", response_model=VideoResponse, status_code=status.HTTP_201_CREATED
+)
+async def create_video_from_youtube(
     video_data: VideoCreate,
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a new video from YouTube URL.
+    """Create video from YouTube URL and process through full pipeline.
 
-    Note: This is a placeholder endpoint. Full implementation will:
-    1. Download video from YouTube
-    2. Create chunks with sentence snap
-    3. Generate transcript
-    4. Generate study plan via LLM
+    This endpoint:
+    1. Downloads video from YouTube (yt-dlp)
+    2. Creates chunks with Hybrid Dynamic sentence-snap (±30s)
+    3. Generates transcript (YouTube subtitles first, Whisper fallback)
+    4. Generates study plan (Phase 3 - LLM)
+
+    Processing is immediate - endpoint waits for completion.
+    For long videos, this may take several minutes.
     """
-    repo = VideoRepository(db)
-    existing = await repo.get_by_youtube_url(video_data.youtube_url)
+    video_repo = VideoRepository(db)
+
+    existing = await video_repo.get_by_youtube_url(video_data.youtube_url)
     if existing:
-        raise HTTPException(status_code=400, detail="Video already exists")
+        raise HTTPException(
+            status_code=400, detail="Video from this URL already exists"
+        )
+
+    download_service = DownloadService(DATA_DIR)
+    try:
+        info = await download_service.get_video_info(video_data.youtube_url)
+        title = info.get("title", f"Video: {video_data.youtube_url[-20:]}")
+    except Exception:
+        title = f"Video: {video_data.youtube_url[-20:]}"
 
     from app.models.video import Video as VideoModel
 
     video = VideoModel(
-        title="Pending: " + video_data.youtube_url[-20:],
+        title=title,
         youtube_url=video_data.youtube_url,
         source_type="youtube",
         chunk_duration=video_data.chunk_duration,
         status="pending",
     )
-    return await repo.create(video)
+    video = await video_repo.create(video)
+
+    video_service = VideoService(
+        video_repo=video_repo,
+        chunk_repo=ChunkRepository(db),
+        transcript_repo=TranscriptRepository(db),
+        study_plan_repo=StudyPlanRepository(db),
+        storage_dir=DATA_DIR,
+    )
+
+    try:
+        video, timings = await video_service.process_video(video.id)
+        return VideoResponse(
+            video=video,
+            chunks=video.chunks,
+            timings=ProcessingTimings(**timings.to_dict()),
+        )
+    except Exception as e:
+        video = await video_repo.get_by_id(video.id)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Video processing failed: {str(e)}. Video status: {video.status}",
+        )
+
+
+@router.post("/{video_id}/retry", response_model=VideoResponse)
+async def retry_video_processing(
+    video_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Retry video processing from last checkpoint.
+
+    Use this endpoint if a previous processing attempt failed.
+    Processing resumes from the last successful state.
+    """
+    video_repo = VideoRepository(db)
+    video = await video_repo.get_by_id(video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    if video.status == "ready":
+        return VideoResponse(
+            video=video,
+            chunks=video.chunks,
+            timings=ProcessingTimings(),
+        )
+
+    video_service = VideoService(
+        video_repo=video_repo,
+        chunk_repo=ChunkRepository(db),
+        transcript_repo=TranscriptRepository(db),
+        study_plan_repo=StudyPlanRepository(db),
+        storage_dir=DATA_DIR,
+    )
+
+    try:
+        video, timings = await video_service.retry_video(video_id)
+        return VideoResponse(
+            video=video,
+            chunks=video.chunks,
+            timings=ProcessingTimings(**timings.to_dict()),
+        )
+    except Exception as e:
+        video = await video_repo.get_by_id(video.id)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Video retry failed: {str(e)}. Video status: {video.status}",
+        )
+
+    try:
+        video = await video_service.retry_video(video_id)
+        return video
+    except Exception as e:
+        video = await video_repo.get_by_id(video_id)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Video retry failed: {str(e)}. Video status: {video.status}",
+        )
 
 
 @router.patch("/{video_id}", response_model=Video)
@@ -90,11 +239,35 @@ async def delete_video(
     video_id: UUID,
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete a video."""
+    """Delete a video and all associated files."""
     repo = VideoRepository(db)
-    success = await repo.delete(video_id)
-    if not success:
+    video = await repo.get_by_id(video_id)
+    if not video:
         raise HTTPException(status_code=404, detail="Video not found")
+
+    video_id_str = str(video_id)
+
+    for ext in ["webm", "mp4"]:
+        video_file = DATA_DIR / "videos" / f"{video_id_str}.{ext}"
+        if video_file.exists():
+            video_file.unlink()
+
+    for lang in ["en", "zh", "ja", "es", "fr", "de"]:
+        for ext in ["json3", "vtt", "srt", "ass", "lrc"]:
+            subtitle_file = DATA_DIR / "subtitles" / f"{video_id_str}.{lang}.{ext}"
+            if subtitle_file.exists():
+                subtitle_file.unlink()
+
+    transcript_file = DATA_DIR / "transcripts" / f"{video_id_str}.json"
+    if transcript_file.exists():
+        transcript_file.unlink()
+
+    for audio_ext in ["mp3", "wav", "m4a", "ogg"]:
+        audio_file = DATA_DIR / "audios" / f"{video_id_str}.{audio_ext}"
+        if audio_file.exists():
+            audio_file.unlink()
+
+    await repo.delete(video_id)
 
 
 @router.get("/{video_id}/chunks", response_model=list[VideoChunk])

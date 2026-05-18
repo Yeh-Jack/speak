@@ -50,3 +50,15 @@ class VideoRepository(BaseRepository[Video]):
         """Get videos by status."""
         result = await self.session.execute(select(Video).where(Video.status == status))
         return list(result.scalars().all())
+
+    async def update_status(
+        self, video_id: UUID, status: str, error_message: str | None = None
+    ) -> Video | None:
+        """Update video status and optionally error_message."""
+        video = await self.get_by_id(video_id)
+        if not video:
+            return None
+        video.status = status
+        if error_message is not None:
+            video.error_message = error_message
+        return await self.save(video)
