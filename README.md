@@ -85,7 +85,7 @@ When a user submits a YouTube URL:
 
 ```
 1. Download (yt-dlp) → MP4/WebM + auto-generated subtitles
-2. Transcribe (YouTube subtitles first, Whisper fallback)
+2. Transcribe (Whisper - always, regardless of YouTube subtitles)
 3. Chunk (Hybrid Dynamic + ±30s sentence snap, using transcript)
 4. Generate Study Plan (LLM: Qwen3.5-2B)
 ```

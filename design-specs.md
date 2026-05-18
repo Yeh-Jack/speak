@@ -1111,8 +1111,8 @@ POST /api/videos/youtube
 └────────┬────────────────────────────────────────────────────┘
          ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ 2. Transcribe (YouTube subtitles first, Whisper fallback)   │
-│    Uses downloaded subtitles as basis for transcript         │
+│ 2. Transcribe (Whisper - always, regardless of YouTube subtitles) │
+│    YouTube subtitles downloaded for reference only (not accurate) │
 │    Checkpoint: "transcribing" → "transcribing_complete"     │
 └────────┬────────────────────────────────────────────────────┘
          ↓

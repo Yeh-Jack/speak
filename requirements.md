@@ -58,7 +58,7 @@ POST /api/videos/youtube
 ↓
 1. Download YouTube video + auto-generated subtitles (yt-dlp) - async I/O
    Subtitles saved to subtitles/ folder
-2. Transcribe (YouTube subtitles first, Whisper fallback) - async
+2. Transcribe (Whisper - always, regardless of YouTube subtitles)
    Uses subtitles as basis for transcript
 3. Segment video (calculate timestamps, ~5-min with sentence snap) - async
    Uses transcript for sentence-aware chunk boundaries
@@ -113,10 +113,10 @@ In Docker: PROJECT_ROOT is `/app`, so data is at `/app/data/`
 ### 2. Subtitle/Transcript Processing
 
 #### 2.1 Subtitle/Transcript Strategy
-- **Simultaneous download**: Video and auto-generated subtitles downloaded together via yt-dlp
+- **Simultaneous download**: Video and auto-generated subtitles downloaded together via yt-dlp (for reference/supplement only)
 - **Subtitles storage**: Saved to `subtitles/` folder with language suffix (e.g., `video_id.en.json3`)
-- **YouTube subtitles first**: Parse downloaded subtitles as basis for transcript
-- **Whisper fallback**: If YouTube subtitles unavailable or insufficient, transcribe using faster-whisper
+- **Always use Whisper**: Transcription is always done via Whisper, regardless of YouTube subtitles availability
+- **YouTube subtitles**: Downloaded but only used as supplementary reference, NOT for transcription (accuracy not guaranteed)
 - **Transcribe before chunk**: Transcript is generated first, then used for sentence-aware chunk boundary detection
 
 ---
@@ -406,7 +406,7 @@ POST /api/chat/stream               # Streaming chat response
 - [ ] Users can submit YouTube URLs
 - [ ] System processes videos immediately (download → chunk with sentence snap → transcribe → study plan)
 - [ ] Videos chunked into ~5-minute segments with sentence boundaries
-- [ ] Subtitles extracted from YouTube first, Whisper fallback if unavailable
+- [ ] Transcriptions generated via Whisper (always, regardless of YouTube subtitles)
 - [ ] Users can create courses with multiple videos
 - [ ] LLM generates study plans immediately during video creation
 - [ ] Resume functionality (5 sec or 3 sentences back)
