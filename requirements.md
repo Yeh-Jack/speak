@@ -56,21 +56,26 @@ An AI-powered English education platform using LLM as a personalized teacher. **
 ```
 POST /api/videos/youtube
 ↓
-1. Download YouTube video (yt-dlp) - async I/O
-2. Segment video (calculate timestamps, ~5-min with sentence snap) - async
-3. Snap to sentence boundaries - align chunks to transcript sentence head/tail
-4. Extract/Generate subtitles (yt-dlp or Whisper) - async
-5. Generate study plan (LLM) - async
-6. Return complete video object with all data
+1. Download YouTube video + auto-generated subtitles (yt-dlp) - async I/O
+   Subtitles saved to subtitles/ folder
+2. Transcribe (YouTube subtitles first, Whisper fallback) - async
+   Uses subtitles as basis for transcript
+3. Segment video (calculate timestamps, ~5-min with sentence snap) - async
+   Uses transcript for sentence-aware chunk boundaries
+4. Generate study plan (LLM) - async
+5. Return complete video object with all data
 ```
 
 **API Behavior**: The endpoint waits for ALL processing to complete before returning. Frontend shows loading state.
+
+**Key Design**: Transcription happens BEFORE chunking to enable sentence-aware chunk boundary detection.
 
 #### 1.3 Video Chunking with Sentence Snap
 
 **Hybrid Dynamic Chunking Algorithm:**
 - **Duration**: ~5 minutes (default 300s, user-adjustable 60-600s)
 - **Method**: Calculate ideal 5-min positions, then search ±30s for nearest sentence boundary
+- **Prerequisite**: Transcript must be generated FIRST (from downloaded subtitles)
 - **Sentence Detection**: Look for `.`, `!`, `?` punctuation in transcript
 - **Snap Behavior**: If sentence boundary found within ±30s of ideal position, extend/shrink chunk to it
 - **Storage**: Keep original video only, use timestamps for navigation
@@ -93,6 +98,7 @@ PROJECT_ROOT/data/
 │   └── learning.db     # SQLite database file
 ├── models/             # LLM model files (Qwen3.5-2B-Q4_K_M.gguf)
 ├── videos/             # Downloaded from YouTube (original file)
+├── subtitles/          # Downloaded auto-generated subtitles (.json3, .vtt, .srt, .ass, .lrc)
 ├── transcripts/        # JSON (YouTube subtitles or Whisper output)
 ├── audios/             # Extracted audio for Whisper
 └── courses/            # Course data
@@ -107,9 +113,11 @@ In Docker: PROJECT_ROOT is `/app`, so data is at `/app/data/`
 ### 2. Subtitle/Transcript Processing
 
 #### 2.1 Subtitle/Transcript Strategy
-- **YouTube subtitles first**: Extract auto-generated subtitles via yt-dlp
+- **Simultaneous download**: Video and auto-generated subtitles downloaded together via yt-dlp
+- **Subtitles storage**: Saved to `subtitles/` folder with language suffix (e.g., `video_id.en.json3`)
+- **YouTube subtitles first**: Parse downloaded subtitles as basis for transcript
 - **Whisper fallback**: If YouTube subtitles unavailable or insufficient, transcribe using faster-whisper
-- Sentence tokenization for chunk boundary alignment
+- **Transcribe before chunk**: Transcript is generated first, then used for sentence-aware chunk boundary detection
 
 ---
 

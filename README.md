@@ -73,6 +73,7 @@ pnpm dev
 ├── data/              # Data storage (gitignored)
 │   ├── db/            # SQLite database
 │   ├── videos/        # Downloaded videos
+│   ├── subtitles/      # Downloaded auto-generated subtitles
 │   ├── transcripts/   # JSON transcripts
 │   └── models/        # LLM model files
 └── docs/              # Documentation
@@ -83,9 +84,9 @@ pnpm dev
 When a user submits a YouTube URL:
 
 ```
-1. Download (yt-dlp) → MP4/WebM
-2. Chunk (Hybrid Dynamic + ±30s sentence snap)
-3. Transcribe (YouTube subtitles first, Whisper fallback)
+1. Download (yt-dlp) → MP4/WebM + auto-generated subtitles
+2. Transcribe (YouTube subtitles first, Whisper fallback)
+3. Chunk (Hybrid Dynamic + ±30s sentence snap, using transcript)
 4. Generate Study Plan (LLM: Qwen3.5-2B)
 ```
 

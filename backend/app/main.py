@@ -1,6 +1,5 @@
 """FastAPI application entry point."""
 
-import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -11,18 +10,18 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.api.v1.router import api_router
 from app.core.config import DATA_DIR, DATABASE_URL, settings
+from app.core.logging import setup_logging, get_logger, is_verbose
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, settings.LOG_LEVEL.upper()),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+setup_logging(
+    log_level=settings.LOG_LEVEL,
+    verbose=is_verbose(),
 )
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def _ensure_data_directories() -> None:
     """Ensure all data storage directories exist."""
-    subdirs = ["db", "videos", "transcripts", "audios", "models"]
+    subdirs = ["db", "videos", "subtitles", "transcripts", "audios", "models"]
     for subdir in subdirs:
         dir_path = DATA_DIR / subdir
         dir_path.mkdir(parents=True, exist_ok=True)

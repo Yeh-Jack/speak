@@ -2,16 +2,16 @@
 
 import asyncio
 import json
-import logging
 import tempfile
 from pathlib import Path
 from typing import List, Optional
 
 import pysubs2
 
+from app.core.logging import get_logger
 from app.services.exceptions import TranscriptionError
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class SubtitleService:
@@ -121,25 +121,33 @@ class WhisperTranscriptionService:
 class TranscriptionService:
     """Orchestrates transcription using strategy pattern.
 
-    1. Try YouTube subtitles (yt-dlp --write-subs)
+    1. Use downloaded YouTube subtitles (from subtitles/ folder)
     2. Fallback to Whisper transcription
     """
 
     def __init__(self, storage_dir: Path):
         self.storage_dir = storage_dir
+        self.subtitles_dir = storage_dir / "subtitles"
         self.transcripts_dir = storage_dir / "transcripts"
         self.audios_dir = storage_dir / "audios"
+        self.subtitles_dir.mkdir(parents=True, exist_ok=True)
         self.transcripts_dir.mkdir(parents=True, exist_ok=True)
         self.audios_dir.mkdir(parents=True, exist_ok=True)
 
         self.subtitle_service = SubtitleService()
         self.whisper_service = WhisperTranscriptionService(model_size="base")
 
-    async def transcribe(self, video_path: Path, language: str = "en") -> List[dict]:
+    async def transcribe(
+        self,
+        video_path: Path,
+        subtitle_paths: list[str] | None = None,
+        language: str = "en",
+    ) -> List[dict]:
         """Transcribe video using available methods.
 
         Args:
             video_path: Path to video file
+            subtitle_paths: Optional list of pre-downloaded subtitle file paths
             language: Language code (default: en)
 
         Returns:
@@ -150,9 +158,15 @@ class TranscriptionService:
         """
         logger.info(f"Starting transcription for {video_path}")
 
+        if subtitle_paths:
+            transcript = await self._parse_subtitle_files(subtitle_paths)
+            if transcript:
+                logger.info(f"Using downloaded subtitles for {video_path}")
+                return transcript
+
         transcript = await self._try_youtube_subtitles(video_path)
         if transcript:
-            logger.info(f"YouTube subtitles available for {video_path}")
+            logger.info(f"YouTube subtitles found for {video_path}")
             return transcript
 
         try:
@@ -163,25 +177,41 @@ class TranscriptionService:
             logger.error(f"Whisper transcription failed: {e}")
             raise TranscriptionError(f"Failed to transcribe video: {e}")
 
-    async def _try_youtube_subtitles(self, video_path: Path) -> Optional[List[dict]]:
-        """Try to extract subtitles from YouTube (if available).
+    async def _parse_subtitle_files(self, subtitle_paths: list[str]) -> List[dict] | None:
+        """Parse downloaded subtitle files into transcript entries.
 
-        Note: This only works if the original URL was a YouTube video and subtitles
-        were uploaded. For downloaded videos, this may fail.
+        Args:
+            subtitle_paths: List of subtitle file paths from download
+
+        Returns:
+            List of transcript entries if parsing successful, None otherwise
+        """
+        for path_str in subtitle_paths:
+            path = Path(path_str)
+            if path.exists():
+                entries = self.subtitle_service.parse_subtitle_file(path)
+                if entries:
+                    return entries
+        return None
+
+    async def _try_youtube_subtitles(self, video_path: Path) -> Optional[List[dict]]:
+        """Try to extract subtitles from subtitles/ folder (yt-dlp saves them there).
+
+        This is a fallback when subtitle_paths were not provided to transcribe().
 
         Returns:
             List of transcript entries if found, None otherwise
         """
         try:
-            video_name = video_path.stem
-            video_dir = video_path.parent
+            video_id = video_path.stem
 
-            for ext in [".srt", ".vtt", ".ass", ".ssa"]:
-                subtitle_path = video_dir / f"{video_name}{ext}"
-                if subtitle_path.exists():
-                    entries = self.subtitle_service.parse_subtitle_file(subtitle_path)
-                    if entries:
-                        return entries
+            for lang in ["en", "zh-Hant"]:
+                for ext in ["json3", "vtt", "srt", "ass", "lrc"]:
+                    subtitle_path = self.subtitles_dir / f"{video_id}.{lang}.{ext}"
+                    if subtitle_path.exists():
+                        entries = self.subtitle_service.parse_subtitle_file(subtitle_path)
+                        if entries:
+                            return entries
 
             return None
         except Exception as e:

@@ -13,7 +13,15 @@ from app.repositories import (
     TranscriptRepository,
     VideoRepository,
 )
-from app.schemas.video import Video, VideoChunk, VideoCreate, VideoInfoResponse, VideoUpdate
+from app.schemas.video import (
+    Video,
+    VideoChunk,
+    VideoCreate,
+    VideoInfoResponse,
+    VideoUpdate,
+    VideoResponse,
+    ProcessingTimings,
+)
 from app.services.video_service import VideoService
 from app.services.download_service import DownloadService
 
@@ -85,7 +93,7 @@ async def get_video_info(
     )
 
 
-@router.post("/youtube", response_model=Video, status_code=status.HTTP_201_CREATED)
+@router.post("/youtube", response_model=VideoResponse, status_code=status.HTTP_201_CREATED)
 async def create_video_from_youtube(
     video_data: VideoCreate,
     db: AsyncSession = Depends(get_db),
@@ -121,7 +129,7 @@ async def create_video_from_youtube(
         youtube_url=video_data.youtube_url,
         source_type="youtube",
         chunk_duration=video_data.chunk_duration,
-        status="pending",  # 'pending' means waiting for download
+        status="pending",
     )
     video = await video_repo.create(video)
 
@@ -134,8 +142,12 @@ async def create_video_from_youtube(
     )
 
     try:
-        video = await video_service.process_video(video.id)
-        return video
+        video, timings = await video_service.process_video(video.id)
+        return VideoResponse(
+            video=video,
+            chunks=video.chunks,
+            timings=ProcessingTimings(**timings.to_dict()),
+        )
     except Exception as e:
         video = await video_repo.get_by_id(video.id)
         raise HTTPException(
@@ -144,7 +156,7 @@ async def create_video_from_youtube(
         )
 
 
-@router.post("/{video_id}/retry", response_model=Video)
+@router.post("/{video_id}/retry", response_model=VideoResponse)
 async def retry_video_processing(
     video_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -160,7 +172,11 @@ async def retry_video_processing(
         raise HTTPException(status_code=404, detail="Video not found")
 
     if video.status == "ready":
-        return video
+        return VideoResponse(
+            video=video,
+            chunks=video.chunks,
+            timings=ProcessingTimings(),
+        )
 
     video_service = VideoService(
         video_repo=video_repo,
@@ -169,6 +185,20 @@ async def retry_video_processing(
         study_plan_repo=StudyPlanRepository(db),
         storage_dir=DATA_DIR,
     )
+
+    try:
+        video, timings = await video_service.retry_video(video_id)
+        return VideoResponse(
+            video=video,
+            chunks=video.chunks,
+            timings=ProcessingTimings(**timings.to_dict()),
+        )
+    except Exception as e:
+        video = await video_repo.get_by_id(video.id)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Video retry failed: {str(e)}. Video status: {video.status}",
+        )
 
     try:
         video = await video_service.retry_video(video_id)

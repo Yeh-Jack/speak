@@ -1,15 +1,15 @@
 """YouTube video download service using yt-dlp."""
 
 import asyncio
-import logging
 from pathlib import Path
 from typing import Optional
 
 import yt_dlp
 
+from app.core.logging import get_logger
 from app.services.exceptions import DownloadError
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class DownloadService:
@@ -18,76 +18,107 @@ class DownloadService:
     def __init__(self, output_dir: Path):
         self.output_dir = output_dir
         self.videos_dir = output_dir / "videos"
+        self.subtitles_dir = output_dir / "subtitles"
         self.videos_dir.mkdir(parents=True, exist_ok=True)
+        self.subtitles_dir.mkdir(parents=True, exist_ok=True)
 
     async def download_video(self, youtube_url: str, video_id: str) -> dict:
-        """Download video from YouTube URL.
+        """Download video and subtitles from YouTube URL.
 
         Args:
             youtube_url: Full YouTube URL
             video_id: Unique identifier for the video
 
         Returns:
-            Path to downloaded video file
+            dict with video info including:
+                - video_path: Path to downloaded video file
+                - subtitle_paths: List of subtitle file paths
+                - title, duration, etc.
 
         Raises:
             DownloadError: If download fails
         """
-        output_path = self.videos_dir / f"{video_id}.webm"
-
         logger.info(f"Downloading video {video_id} from {youtube_url}")
 
         try:
-            info = await asyncio.to_thread(
-                self._download_sync, youtube_url, str(output_path)
-            )
+            info = await asyncio.to_thread(self._download_sync, youtube_url, video_id)
         except Exception as e:
             logger.error(f"Download failed for {video_id}: {e}")
             raise DownloadError(f"Failed to download video: {e}")
 
-        if not output_path.exists():
-            raise DownloadError(f"Download completed but file not found: {output_path}")
+        video_path = Path(info.get("video_path", self.videos_dir / f"{video_id}.webm"))
+        if not video_path.exists():
+            raise DownloadError(f"Download completed but file not found: {video_path}")
 
-        logger.info(f"Video downloaded successfully: {output_path}")
+        logger.info(f"Video downloaded successfully: {video_path}")
+        logger.info(f"Subtitles downloaded: {info.get('subtitle_paths', [])}")
         return info
 
-    def _download_sync(self, youtube_url: str, output_path: str) -> dict:
+    def _download_sync(self, youtube_url: str, video_id: str) -> dict:
         """Synchronous download using yt-dlp.
-                Subtitle formats :
-                    Potential choices:
-                        1. json3 : For NLP/AI transcript processing.
-                        2. lrc : with timestamped lines.
-        | Format          | Type                      | Best Use                | Notes                                 |
-        | --------------- | ------------------------- | ----------------------- | ------------------------------------- |
-        | `vtt`           | WebVTT text               | General subtitle usage  | Most common and clean                 |
-        | `srt`           | SubRip text               | Media players/editors   | Widely supported                      |
-        | `ass`           | Advanced SubStation Alpha | Styled subtitles        | Supports colors/positioning           |
-        | `lrc`           | Lyric format              | Karaoke/audio sync      | Timestamped lines                     |
-        | `ttml` / `dfxp` | XML subtitles             | Broadcast/pro workflows | Structured XML                        |
-        | `srv1`          | YouTube XML               | Basic auto captions     | Older/simple XML                      |
-        | `srv2`          | YouTube XML               | Better timing           | More structured                       |
-        | `srv3`          | YouTube XML               | Rich formatting         | Newer YouTube XML                     |
-        | `json3`         | YouTube JSON              | Programmatic parsing    | Best for NLP/AI/transcript processing |
+
+        Downloads video and auto-generated subtitles simultaneously.
+        Subtitles are saved to the subtitles/ folder after download.
+        The transcription service will look for them during processing.
+
+        If subtitle download fails (e.g., due to rate limiting), the video
+        is still returned successfully - transcription will fall back to Whisper.
+
+        Subtitle formats:
+            | Format          | Type                      | Best Use                |
+            | --------------- | ------------------------- | ----------------------- |
+            | `json3`         | YouTube JSON              | NLP/AI/transcript proc  |
+            | `vtt`           | WebVTT text               | General subtitle usage  |
+            | `srt`           | SubRip text               | Media players/editors   |
+            | `ass`           | Advanced SubStation Alpha | Styled subtitles        |
+            | `lrc`           | Lyric format              | Karaoke/audio sync      |
+
+        Returns:
+            dict with video info including 'subtitle_paths' list
         """
+        video_output = str(self.videos_dir / video_id)
+        video_path = self.videos_dir / f"{video_id}.webm"
+
+        subtitleslangs = ["en"]
         ydl_opts = {
             "quiet": True,
-            "no_warnings": True,
+            "no_warnings": False,
             "extract_flat": False,
             "format": "bestvideo[ext=webm]+bestaudio[ext=webm]/best[ext=webm]/best",
-            "outtmpl": output_path.replace(".webm", ""),
-            # --- Download subtitles
+            "outtmpl": video_output,
             "writesubtitles": True,
             "writeautomaticsub": True,
-            # 1. Choose languages
-            "subtitleslangs": ["en", "zh-Hant"],
-            # 2. Preferred subtitle format
-            "subtitlesformat": "json3/vtt/lrc/ass",
+            "subtitleslangs": subtitleslangs,
+            "subtitlesformat": "json3/vtt/lrc/ass/srt",
         }
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # ydl.download([youtube_url])
-            info = ydl.extract_info(youtube_url, download=True)
-            return info
+        info = None
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(youtube_url, download=True)
+        except Exception as e:
+            if not video_path.exists():
+                logger.error(f"Video download failed: {e}")
+                raise DownloadError(f"Video download failed: {e}")
+            logger.warning(f"Subtitle download failed (will fallback to Whisper): {e}")
+
+        if not video_path.exists():
+            logger.error(f"Video file not found after download")
+            raise DownloadError("Video file not found after download - download may have failed")
+
+        subtitle_paths = []
+        for lang in subtitleslangs:
+            for ext in ["json3", "vtt", "srt", "ass", "lrc"]:
+                path = self.videos_dir / f"{video_id}.{lang}.{ext}"
+                if path.exists():
+                    subtitle_paths.append(str(path))
+                    moved_path = self.subtitles_dir / f"{video_id}.{lang}.{ext}"
+                    path.rename(moved_path)
+                    logger.info(f"Moved subtitle to: {moved_path}")
+
+        info["subtitle_paths"] = subtitle_paths
+        info["video_path"] = str(video_path)
+        return info
 
     async def get_video_info(self, youtube_url: str) -> dict:
         """Get video metadata without downloading.

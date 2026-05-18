@@ -1,11 +1,12 @@
 """Hybrid Dynamic chunking service with ±30s sentence boundary snap."""
 
-import logging
 from dataclasses import dataclass
 from typing import List
+
+from app.core.logging import get_logger
 from app.services.exceptions import ChunkingError
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass

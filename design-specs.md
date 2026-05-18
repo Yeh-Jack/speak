@@ -984,23 +984,23 @@ test('displays video title', async () => {
 The video processing pipeline implements a **state machine** with checkpoint-resume capability:
 
 ```
-pending → downloading → downloading_complete → chunking → chunking_complete 
-         → transcribing → transcribing_complete → studying → ready
-         └────────────────────── or ───────────────────────────────┘
-                                    ↓
-                               failed (with error_message)
+pending → downloading → downloading_complete → transcribing → transcribing_complete 
+          → chunking → chunking_complete → studying → ready
+          └────────────────────── or ───────────────────────────────┘
+                                     ↓
+                                failed (with error_message)
 ```
 
 **States:**
 | State | Description |
 |-------|-------------|
 | `pending` | Video created, awaiting processing |
-| `downloading` | yt-dlp is downloading the video |
-| `downloading_complete` | Video downloaded successfully, ready for chunking |
-| `chunking` | Calculating chunks with sentence snap |
-| `chunking_complete` | Chunks created, ready for transcription |
-| `transcribing` | Extracting/generating subtitles |
-| `transcribing_complete` | Transcript ready, ready for study plan |
+| `downloading` | yt-dlp is downloading the video + subtitles |
+| `downloading_complete` | Video and subtitles downloaded, ready for transcription |
+| `transcribing` | Extracting transcript from downloaded subtitles |
+| `transcribing_complete` | Transcript ready, ready for chunking |
+| `chunking` | Calculating chunks with sentence snap (uses transcript) |
+| `chunking_complete` | Chunks created, ready for study plan |
 | `studying` | LLM is generating study plan |
 | `ready` | All processing complete |
 | `failed` | Processing failed at some step |
@@ -1017,6 +1017,8 @@ The chunking algorithm uses **Hybrid Dynamic** approach:
 1. **Calculate ideal 5-min positions**: (0:00-5:00), (5:00-10:00), etc.
 2. **Search ±30s for sentence boundary**: For each ideal boundary, search transcript within ±30 seconds for nearest sentence-ending punctuation (`.`, `!`, `?`)
 3. **Snap to sentence boundary**: Adjust chunk end to include the full sentence
+
+**Note**: Transcription happens BEFORE chunking so that the transcript can be used for sentence-aware chunk boundary detection.
 
 **Algorithm:**
 ```
@@ -1050,13 +1052,21 @@ class VideoService:
             # Step 1: Download
             if video.status == "pending":
                 await self._update_status(video, "downloading")
-                video.file_path = await self._download(video.youtube_url)
+                info = await self._download(video.youtube_url)
+                video.file_path = info["video_path"]
+                video.subtitle_paths = info["subtitle_paths"]
                 await self._update_status(video, "downloading_complete")
             
-            # Step 2: Chunk
+            # Step 2: Transcribe (uses downloaded subtitles)
             if video.status == "downloading_complete":
+                await self._update_status(video, "transcribing")
+                transcript = await self._transcribe(video, video.subtitle_paths)
+                await self._update_status(video, "transcribing_complete")
+            
+            # Step 3: Chunk (uses transcript for sentence snap)
+            if video.status == "transcribing_complete":
                 await self._update_status(video, "chunking")
-                chunks = await self._create_chunks_with_snap(video)
+                chunks = await self._create_chunks_with_snap(video, transcript)
                 await self.chunk_repo.create_many(video.id, chunks)
                 await self._update_status(video, "chunking_complete")
             
@@ -1094,18 +1104,22 @@ class VideoService:
 POST /api/videos/youtube
 ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ 1. Download (yt-dlp) → MP4/WebM                             │
+│ 1. Download (yt-dlp) → MP4/WebM + auto-generated subtitles  │
+│    Downloads video and subtitles simultaneously              │
+│    Subtitles saved to data/subtitles/ folder                 │
 │    Checkpoint: "downloading" → "downloading_complete"       │
 └────────┬────────────────────────────────────────────────────┘
          ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ 2. Chunk (Hybrid Dynamic + Sentence Snap)                   │
-│    Checkpoint: "chunking" → "chunking_complete"             │
+│ 2. Transcribe (YouTube subtitles first, Whisper fallback)   │
+│    Uses downloaded subtitles as basis for transcript         │
+│    Checkpoint: "transcribing" → "transcribing_complete"     │
 └────────┬────────────────────────────────────────────────────┘
          ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ 3. Transcribe (YouTube subtitles first, Whisper fallback)   │
-│    Checkpoint: "transcribing" → "transcribing_complete"     │
+│ 3. Chunk (Hybrid Dynamic + Sentence Snap)                   │
+│    Uses transcript for sentence-aware chunk boundaries      │
+│    Checkpoint: "chunking" → "chunking_complete"             │
 └────────┬────────────────────────────────────────────────────┘
          ↓
 ┌─────────────────────────────────────────────────────────────┐

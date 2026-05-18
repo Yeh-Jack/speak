@@ -103,6 +103,17 @@ class Video(VideoBase):
     updated_at: datetime
 
 
+class ProcessingTimings(BaseModel):
+    """Elapsed time metrics for video processing stages."""
+
+    download_seconds: float = 0.0
+    transcription_seconds: float = 0.0
+    chunking_seconds: float = 0.0
+    study_plan_seconds: float = 0.0
+    total_seconds: float = 0.0
+    stages_completed: list[str] = []
+
+
 class VideoResponse(BaseModel):
     """Complete video response with all data."""
 
@@ -110,6 +121,7 @@ class VideoResponse(BaseModel):
     chunks: list[VideoChunk]
     transcript: dict | None = None
     study_plan: dict | None = None
+    timings: ProcessingTimings | None = None
 
 
 class VideoFormatInfo(BaseModel):
