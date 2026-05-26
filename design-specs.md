@@ -809,6 +809,15 @@ duration FLOAT NOT NULL,
 chunk_duration FLOAT DEFAULT 300, -- User-adjustable: 60-600 seconds, default 300
 status VARCHAR(50) DEFAULT 'pending', -- pending, downloading, downloading_complete, chunking, chunking_complete, transcribing, transcribing_complete, studying, ready, failed
 error_message TEXT, -- Checkpoint-resume: stores error on failure
+
+-- Video metadata from YouTube
+thumbnail VARCHAR(500), -- Video thumbnail URL
+uploader VARCHAR(500), -- Channel name
+upload_date VARCHAR(20), -- Publication date (YYYYMMDD format)
+view_count INTEGER, -- Number of views
+like_count INTEGER, -- Number of likes
+metadata_json JSON, -- Additional data (categories, tags, language, subtitle languages, available formats)
+
 created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -1124,9 +1133,23 @@ POST /api/videos/youtube
          ↓
 ┌─────────────────────────────────────────────────────────────┐
 │ 4. Study Plan (LLM)                                         │
+│    Uses highest priority transcript: user > youtube_author > whisper > youtube_auto │
 │    Checkpoint: "studying" → "ready"                         │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+### Triple Transcript System
+
+The system maintains four types of transcripts with priority order:
+
+| Priority | Source | Description |
+|----------|--------|-------------|
+| 1 (Highest) | user | User-uploaded subtitles via `POST /api/videos/{id}/transcripts/user` |
+| 2 | youtube_author | YouTube creator-uploaded subtitles (from `subtitles` metadata) |
+| 3 | whisper | Whisper transcription (always generated) |
+| 4 (Lowest) | youtube_auto | YouTube auto-generated captions (from `automatic_captions` metadata) |
+
+Study plan generation automatically selects the highest priority available transcript.
 
 ### API Endpoints
 
@@ -1135,6 +1158,8 @@ POST /api/videos/youtube
 # GET /api/videos/{id} - Get video with current status
 # POST /api/videos/{id}/retry - Retry from last checkpoint
 # GET /api/videos/{id}/chunks - Get calculated chunks
+# GET /api/videos/{id}/transcripts/{type} - Get transcript (user, youtube_author, whisper, youtube_auto)
+# POST /api/videos/{id}/transcripts/user - Upload user subtitles (highest priority)
 ```
 
 ### Chunking Service Implementation
@@ -1764,6 +1789,7 @@ def get_cached_model(model_name: str):
 | 2025-04-24 | 4.0 | AI Assistant | Added video/audio format constraints (MP4/WebM, MP3/WebM) |
 | 2025-04-24 | 5.0 | AI Assistant | Removed Auth Service, Exam Service, user references; cleaned up React remnants |
 | 2026-04-26 | 6.0 | AI Assistant | Phase 2 design: Hybrid Dynamic chunking (±30s sentence snap), checkpoint-resume state machine, error_message field |
+| 2026-05-19 | 7.0 | AI Assistant | Added quadruple transcript system with priority: user > youtube_author > whisper > youtube_auto |
 
 ---
 

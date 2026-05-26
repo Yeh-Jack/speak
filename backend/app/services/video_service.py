@@ -1,5 +1,6 @@
 """Video service orchestrator with checkpoint-resume state machine."""
 
+import asyncio
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -23,6 +24,7 @@ from app.services.exceptions import (
     VideoProcessingError,
 )
 from app.services.transcription_service import TranscriptionService
+from app.services.llm_service import LLMService
 from app.core.config import DATA_DIR
 
 logger = get_logger(__name__)
@@ -35,7 +37,10 @@ class ProcessingTimings:
     download_seconds: float = 0.0
     transcription_seconds: float = 0.0
     chunking_seconds: float = 0.0
+    audio_extraction_seconds: float = 0.0
     study_plan_seconds: float = 0.0
+    llm_init_seconds: float = 0.0
+    llm_inference_seconds: float = 0.0
     total_seconds: float = 0.0
     stages_completed: List[str] = field(default_factory=list)
 
@@ -44,7 +49,10 @@ class ProcessingTimings:
             "download_seconds": round(self.download_seconds, 2),
             "transcription_seconds": round(self.transcription_seconds, 2),
             "chunking_seconds": round(self.chunking_seconds, 2),
+            "audio_extraction_seconds": round(self.audio_extraction_seconds, 2),
             "study_plan_seconds": round(self.study_plan_seconds, 2),
+            "llm_init_seconds": round(self.llm_init_seconds, 2),
+            "llm_inference_seconds": round(self.llm_inference_seconds, 2),
             "total_seconds": round(self.total_seconds, 2),
             "stages_completed": self.stages_completed,
         }
@@ -61,6 +69,12 @@ class VideoService:
 
     On failure, video stays in last successful state with error_message set.
     Use retry_video() to resume from checkpoint.
+
+    Transcript Priority (highest to lowest):
+        1. user - Student-uploaded subtitles
+        2. youtube_author - YouTube author-uploaded subtitles
+        3. whisper - Whisper transcription (always available)
+        4. youtube_auto - YouTube auto-generated captions
     """
 
     def __init__(
@@ -72,6 +86,7 @@ class VideoService:
         download_service: DownloadService | None = None,
         chunking_service: ChunkingService | None = None,
         transcription_service: TranscriptionService | None = None,
+        llm_service: LLMService | None = None,
         storage_dir: Path = DATA_DIR,
     ):
         self.video_repo = video_repo
@@ -81,6 +96,7 @@ class VideoService:
         self.download_service = download_service or DownloadService(storage_dir)
         self.chunking_service = chunking_service or ChunkingService()
         self.transcription_service = transcription_service or TranscriptionService(storage_dir)
+        self.llm_service = llm_service or LLMService()
 
     async def process_video(self, video_id: UUID) -> tuple[Video, ProcessingTimings]:
         """Process video through full pipeline with checkpoint-resume.
@@ -126,15 +142,59 @@ class VideoService:
                 video.file_path = info.get("video_path")
                 video.title = info.get("title", video.title)
                 video.duration = info.get("duration", 0.0)
-                video.subtitle_paths = info.get("subtitle_paths", [])
+                video.subtitle_paths = info.get("subtitle_paths", {})
+                video.thumbnail = info.get("thumbnail")
+                video.uploader = info.get("uploader")
+                video.upload_date = info.get("upload_date")
+                video.view_count = info.get("view_count")
+                video.like_count = info.get("like_count")
+                video.metadata_json = {
+                    "categories": info.get("categories"),
+                    "tags": info.get("tags"),
+                    "language": info.get("language"),
+                    "subtitles": info.get("subtitles"),
+                    "automatic_captions": info.get("automatic_captions"),
+                    "available_formats": info.get("available_formats"),
+                }
                 await self._update_status(video, "downloading_complete")
 
             if video.status == "downloading_complete":
                 current_stage = "transcription"
                 start = time.perf_counter()
                 await self._update_status(video, "transcribing")
-                transcript = await self._transcribe_video(video)
-                await self.transcript_repo.create(video.id, transcript)
+                (
+                    youtube_author_transcript,
+                    youtube_auto_transcript,
+                    whisper_transcript,
+                ) = await self._transcribe_video(video)
+
+                if youtube_author_transcript:
+                    await self.transcript_repo.create(
+                        video.id,
+                        {
+                            "source": "youtube_author",
+                            "segments": youtube_author_transcript,
+                            "language": "en",
+                        },
+                    )
+                if youtube_auto_transcript:
+                    await self.transcript_repo.create(
+                        video.id,
+                        {
+                            "source": "youtube_auto",
+                            "segments": youtube_auto_transcript,
+                            "language": "en",
+                        },
+                    )
+                await self.transcript_repo.create(
+                    video.id,
+                    {
+                        "source": "whisper",
+                        "segments": whisper_transcript,
+                        "language": "en",
+                    },
+                )
+
                 timings.transcription_seconds = time.perf_counter() - start
                 timings.stages_completed.append("transcription")
                 logger.info(
@@ -154,15 +214,33 @@ class VideoService:
                 await self._update_status(video, "chunking_complete")
 
             if video.status == "chunking_complete":
+                current_stage = "audio_extraction"
+                start = time.perf_counter()
+                await self._update_status(video, "extracting_audio")
+                await self._extract_audio_chunks(video)
+                timings.audio_extraction_seconds = time.perf_counter() - start
+                timings.stages_completed.append("audio_extraction")
+                logger.info(
+                    f"[TIMING] Audio extraction stage completed in {timings.audio_extraction_seconds:.2f}s"
+                )
+                await self._update_status(video, "audio_extracted")
+
+            if video.status == "audio_extracted":
                 current_stage = "study_plan"
                 start = time.perf_counter()
                 await self._update_status(video, "studying")
-                study_plan = {"objectives": [], "vocabulary": [], "grammar": []}
+                transcript = await self.get_transcript_by_priority(video.id)
+                transcript_data = {"segments": transcript.segments} if transcript else {}
+                study_plan, llm_timings = await self._generate_study_plan(video, transcript_data)
                 await self.study_plan_repo.create(video.id, study_plan)
                 timings.study_plan_seconds = time.perf_counter() - start
+                timings.llm_init_seconds = llm_timings.get("llm_init_seconds", 0.0)
+                timings.llm_inference_seconds = llm_timings.get("llm_inference_seconds", 0.0)
                 timings.stages_completed.append("study_plan")
                 logger.info(
-                    f"[TIMING] Study plan stage completed in {timings.study_plan_seconds:.2f}s"
+                    f"[TIMING] Study plan stage completed in {timings.study_plan_seconds:.2f}s "
+                    f"(llm_init={timings.llm_init_seconds:.2f}s, "
+                    f"llm_inference={timings.llm_inference_seconds:.2f}s)"
                 )
                 await self._update_status(video, "ready")
 
@@ -179,7 +257,16 @@ class VideoService:
                 f"Video {video_id} processing failed at {current_stage} after {timings.total_seconds:.2f}s: {e}"
             )
             logger.error(f"[TIMING] Failed stage timings: {timings.to_dict()}")
-            await self._update_status(video, "failed", error_message=str(e))
+            stage_to_status = {
+                "download": "downloading_complete",
+                "transcription": "transcribing_complete",
+                "chunking": "chunking_complete",
+                "audio_extraction": "audio_extracted",
+                "study_plan": "ready",
+            }
+            last_completed = timings.stages_completed[-1] if timings.stages_completed else None
+            resume_status = stage_to_status.get(last_completed, "pending")
+            await self._update_status(video, resume_status, error_message=str(e))
             raise
 
     async def retry_video(self, video_id: UUID) -> tuple[Video, ProcessingTimings]:
@@ -203,10 +290,7 @@ class VideoService:
             logger.info(f"Video {video_id} already complete")
             return video, ProcessingTimings()
 
-        if video.status == "failed":
-            logger.info(f"Retrying video {video_id} from checkpoint")
-            return await self.process_video(video_id)
-
+        logger.info(f"Retrying video {video_id} from status {video.status}")
         return await self.process_video(video_id)
 
     async def _update_status(
@@ -226,7 +310,7 @@ class VideoService:
         """Create chunks with Hybrid Dynamic sentence-snap."""
         duration = video.duration
 
-        transcript = await self.transcript_repo.get_by_video_id(video.id)
+        transcript = await self.get_transcript_by_priority(video.id)
         transcript_data = []
         if transcript:
             transcript_data = transcript.segments if hasattr(transcript, "segments") else []
@@ -249,30 +333,129 @@ class VideoService:
             for c in chunk_models
         ]
 
-    async def _transcribe_video(self, video: Video) -> dict:
-        """Transcribe video using downloaded subtitles as basis.
+    async def _transcribe_video(
+        self, video: Video
+    ) -> tuple[Optional[list[dict]], Optional[list[dict]], list[dict]]:
+        """Transcribe video using triple transcript system.
+
+        Always runs Whisper. Tries to get YouTube author and auto subtitles if available.
 
         Args:
             video: Video model with file_path and subtitle_paths
 
         Returns:
-            dict with transcript segments
+            Tuple of (youtube_author_transcript, youtube_auto_transcript, whisper_transcript)
         """
         video_path = Path(video.file_path)
-        subtitle_paths = getattr(video, "subtitle_paths", []) or []
-        transcript_entries = await self.transcription_service.transcribe(
+        subtitle_paths = getattr(video, "subtitle_paths", {}) or {}
+        (
+            youtube_author_transcript,
+            youtube_auto_transcript,
+            whisper_transcript,
+        ) = await self.transcription_service.get_dual_transcripts(
             video_path, subtitle_paths=subtitle_paths
         )
-        return {
-            "segments": transcript_entries,
-            "language": "en",
-        }
+        return youtube_author_transcript, youtube_auto_transcript, whisper_transcript
+
+    async def _extract_audio_chunks(self, video: Video) -> None:
+        """Extract audio for each chunk in mp3 format.
+
+        Args:
+            video: Video model with file_path and chunks
+        """
+        video_path = Path(video.file_path)
+        video_audios_dir = self.transcription_service.storage_dir / "audios" / str(video.id)
+        video_audios_dir.mkdir(parents=True, exist_ok=True)
+
+        chunks = await self.chunk_repo.get_by_video_id(video.id)
+        if not chunks:
+            logger.warning(f"No chunks found for video {video.id}")
+            return
+
+        for chunk in chunks:
+            audio_path = video_audios_dir / f"chunk_{chunk.chunk_index}.mp3"
+            if audio_path.exists():
+                logger.info(f"Audio already exists for chunk {chunk.chunk_index}")
+                continue
+
+            await self._extract_audio_chunk(
+                video_path, chunk.start_time, chunk.end_time, audio_path
+            )
+            logger.info(f"Extracted audio for chunk {chunk.chunk_index}: {audio_path}")
+
+    async def _extract_audio_chunk(
+        self, video_path: Path, start_time: float, end_time: float, output_path: Path
+    ) -> Path:
+        """Extract a specific audio chunk from video.
+
+        Args:
+            video_path: Path to video file
+            start_time: Start time in seconds
+            end_time: End time in seconds
+            output_path: Output path for mp3 file
+
+        Returns:
+            Path to extracted audio file
+        """
+        cmd = [
+            "ffmpeg",
+            "-i",
+            str(video_path),
+            "-ss",
+            str(start_time),
+            "-to",
+            str(end_time),
+            "-vn",
+            "-acodec",
+            "libmp3lame",
+            "-ab",
+            "128k",
+            "-y",
+            str(output_path),
+        ]
+
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await process.communicate()
+
+        if process.returncode != 0:
+            logger.error(f"FFmpeg audio extraction failed: {stderr.decode()}")
+            raise TranscriptionError(f"FFmpeg audio extraction failed: {stderr.decode()}")
+
+        return output_path
 
     async def _generate_study_plan(self, video: Video, transcript: dict) -> dict:
-        """Generate study plan using LLM (stub for Phase 3)."""
-        return {
-            "objectives": ["Understand the main topic"],
-            "vocabulary": [],
-            "grammar": [],
-            "estimated_time": "30 minutes",
-        }
+        """Generate study plan using LLM."""
+        logger.info(f"Generating study plan for video {video.id}")
+        return await self.llm_service.generate_study_plan(
+            transcript=transcript,
+            video_title=video.title or "Untitled Video",
+            video_duration=video.duration or 0.0,
+        )
+
+    async def get_transcript_by_priority(self, video_id: UUID) -> dict | None:
+        """Get transcript using priority: user > youtube_author > whisper > youtube_auto.
+
+        Returns the highest priority available transcript.
+
+        Priority:
+            1. user - Student-uploaded subtitles (highest)
+            2. youtube_author - YouTube author-uploaded subtitles
+            3. whisper - Whisper transcription (always available)
+            4. youtube_auto - YouTube auto-generated captions (lowest)
+
+        Args:
+            video_id: Video UUID
+
+        Returns:
+            Transcript with highest priority, or None if none available
+        """
+        for source in ["user", "youtube_author", "whisper", "youtube_auto"]:
+            transcript = await self.transcript_repo.get_by_video_and_source(video_id, source)
+            if transcript and hasattr(transcript, "segments") and transcript.segments:
+                logger.info(f"Selected {source} transcript for video {video_id}")
+                return transcript
+        return None
