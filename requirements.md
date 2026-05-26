@@ -108,15 +108,28 @@ In Docker: PROJECT_ROOT is `/app`, so data is at `/app/data/`
 
 **Note**: No physical chunk files - chunks are virtual with timestamps into the original video. Chunks snap to sentence boundaries.
 
+**Video Metadata Storage**: When downloading a video, the following metadata is stored in SQLite:
+- `thumbnail` - Video thumbnail URL
+- `uploader` - Channel name  
+- `upload_date` - Publication date (YYYYMMDD format)
+- `view_count` - Number of views
+- `like_count` - Number of likes
+- `metadata_json` - Additional data (categories, tags, language, available formats, subtitle languages)
+
 ---
 
 ### 2. Subtitle/Transcript Processing
 
 #### 2.1 Subtitle/Transcript Strategy
-- **Simultaneous download**: Video and auto-generated subtitles downloaded together via yt-dlp (for reference/supplement only)
+- **Quadruple transcript system**: Four types of subtitles (user-uploaded, youtube_author, youtube_auto, whisper)
+- **Subtitle priority**: user > youtube_author > whisper > youtube_auto (user-uploaded has highest priority for study plan)
+- **YouTube author subtitles** (subtitles field): Creator-uploaded, generally more accurate and properly timed
+- **YouTube auto captions** (automatic_captions field): YouTube's ASR-generated captions, less accurate
+- **Simultaneous download**: Video and auto-generated subtitles downloaded together via yt-dlp
 - **Subtitles storage**: Saved to `subtitles/` folder with language suffix (e.g., `video_id.en.json3`)
 - **Always use Whisper**: Transcription is always done via Whisper, regardless of YouTube subtitles availability
 - **YouTube subtitles**: Downloaded but only used as supplementary reference, NOT for transcription (accuracy not guaranteed)
+- **User-uploaded**: Users can upload their own subtitles via API endpoint `POST /api/videos/{id}/transcripts/user`
 - **Transcribe before chunk**: Transcript is generated first, then used for sentence-aware chunk boundary detection
 
 ---

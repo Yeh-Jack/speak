@@ -31,7 +31,7 @@ dependencies = [
     "alembic>=1.13.0",
     # LLM - llama-cpp-python with GPU support
     # NVIDIA (CUDA): uv pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121
-    "llama-cpp-python>=0.2.26",
+    "llama-cpp-python>=0.3.23",
     # GPU detection - NVIDIA and AMD support
     "gputil>=1.4.0",
     "pyamdgpuinfo>=2.1.6; sys_platform == 'linux'",

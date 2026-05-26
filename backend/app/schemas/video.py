@@ -98,6 +98,12 @@ class Video(VideoBase):
     file_path: str | None
     duration: float
     status: str
+    thumbnail: str | None = None
+    uploader: str | None = None
+    upload_date: str | None = None
+    view_count: int | None = None
+    like_count: int | None = None
+    metadata_json: dict | None = None
     chunks: list[VideoChunk] = []
     created_at: datetime
     updated_at: datetime
