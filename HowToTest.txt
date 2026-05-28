@@ -69,3 +69,11 @@ Check video status and error_message field:
 cd /workspaces/education
 sqlite3 data/db/learning.db "SELECT id, title, status, error_message FROM videos;"
 
+Issues :
+A. The prompt is too long and there's not enough room for the full response.
+   1. Max_tokens=8192 exceeded the model's context window of 4096
+   2. Transcript at 8000 chars was too long, leaving insufficient room for the bilingual JSON response
+   Changes:
+     - Reduced max_tokens from 8192 → 4096
+     - Reduced transcript from 8000 → 4000 chars
+     - Added "Ensure the JSON is complete and valid" to the prompt

@@ -106,7 +106,7 @@ class LLMService:
 
 Video Title: {video_title}
 Video Duration: {int(video_duration)} seconds
-Transcript (first 8000 chars): {transcript_text[:8000]}
+Transcript (first 4000 chars): {transcript_text[:4000]}
 
 Generate a study plan in the following JSON format:
 {{
@@ -116,16 +116,23 @@ Generate a study plan in the following JSON format:
     "vocabulary": [
         {{
             "word": "important word or phrase",
+            "word_zh": "重要單詞或片語（繁體中文）",
             "definition": "clear English definition",
+            "definition_zh": "清晰的中文定義",
             "example": "example sentence using the word",
-            "difficulty": "easy|medium|hard"
+            "example_zh": "使用該詞的例句（繁體中文）",
+            "difficulty": "easy|medium|hard",
+            "difficulty_zh": "簡單|中等|困難"
         }}
     ],
     "grammar": [
         {{
             "pattern": "grammatical structure",
-            "explanation": "how it's used in this context",
-            "examples": ["example 1", "example 2"]
+            "pattern_zh": "語法結構（繁體中文）",
+            "explanation": "how it's used in this context (English)",
+            "explanation_zh": "在此語境中的用法（繁體中文）",
+            "examples": ["sentence using the pattern", "another sentence using the pattern"],
+            "examples_zh": ["使用該語法結構的例句（繁體中文）", "另一個使用該語法結構的例句（繁體中文）"]
         }}
     ],
     "chunks": [
@@ -133,14 +140,18 @@ Generate a study plan in the following JSON format:
             "chunk_index": 0,
             "time_range": "0:00-5:00",
             "summary": "brief summary of this segment",
+            "summary_zh": "此片段的簡要摘要（繁體中文）",
             "key_points": ["point 1", "point 2"],
-            "practice_suggestions": ["suggestion 1", "suggestion 2"]
+            "key_points_zh": ["要點1（繁體中文）", "要點2（繁體中文）"],
+            "practice_suggestions": ["suggestion 1", "suggestion 2"],
+            "practice_suggestions_zh": ["練習建議1（繁體中文）", "練習建議2（繁體中文）"]
         }}
     ],
-    "notes": "Additional pedagogical notes for the learner"
+    "notes": "Additional pedagogical notes for the learner",
+    "notes_zh": "給學習者的額外教學筆記（繁體中文）"
 }}
 
-Only return the JSON, no other text."""
+Only return the JSON, no other text. Ensure the JSON is complete and valid."""
 
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -193,7 +204,7 @@ Only return the JSON, no other text."""
             self._model.reset()
             response = self._model.create_chat_completion(
                 messages=messages,
-                max_tokens=8192,
+                max_tokens=4096,
                 temperature=0.3,
                 top_p=0.9,
                 repeat_penalty=1.1,
@@ -252,6 +263,7 @@ Only return the JSON, no other text."""
             "grammar": plan.get("grammar", []),
             "chunks": plan.get("chunks", []),
             "notes": plan.get("notes", ""),
+            "notes_zh": plan.get("notes_zh", ""),
         }
         return validated
 

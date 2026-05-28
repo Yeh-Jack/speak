@@ -10,6 +10,31 @@ An AI-powered English education platform using LLM as a personalized teacher. **
 
 ---
 
+## Language Requirements
+
+### Mandatory Traditional Chinese (繁體中文)
+
+**ALL Chinese text throughout the entire application MUST use Traditional Chinese. No Simplified Chinese is allowed.**
+
+This rule applies to:
+- All LLM-generated content (study plans, vocabulary definitions, grammar explanations, feedback)
+- User-facing text in frontend UI
+- Any Chinese explanations, notes, or feedback
+- API responses containing Chinese text
+- Any documentation or inline comments in Chinese
+
+**LLM Prompt Requirements**:
+All LLM prompts must explicitly instruct the model to respond in Traditional Chinese when generating Chinese content. Example instruction to include:
+
+```
+IMPORTANT: When generating any Chinese text (definitions, explanations, notes, feedback),
+you MUST use Traditional Chinese (繁體中文). Do NOT use Simplified Chinese.
+Examples of Traditional Chinese: 是、開發、學習、詞彙、語法
+Examples to AVOID (Simplified): 是、开发、学习、词汇、语法
+```
+
+---
+
 ## Tech Stack
 
 | Component | Technology | Version/Notes |
@@ -38,6 +63,7 @@ An AI-powered English education platform using LLM as a personalized teacher. **
 - **Safety Buffer**: Leaves 1GB VRAM free for other operations
 - **Streaming**: Supported for real-time token generation
 - **No Model Switching** - Single fixed model only
+- **Language Rule**: **ALL Chinese text must be Traditional Chinese (繁體中文)** - No Simplified Chinese allowed. This applies to all LLM-generated content, user-facing text, and any Chinese feedback or explanations.
 
 ---
 
@@ -226,16 +252,18 @@ class VideoCourseItem:
       "end": "05:00",
       "objectives": ["Learn 10 new vocabulary words"],
       "vocabulary": [
-        {"word": "innovation", "definition": "...", "cefr": "B2", "context": "..."}
+        {"word": "innovation", "word_zh": "創新", "definition": "...", "definition_zh": "...", "cefr": "B2", "cefr_zh": "B2", "context": "...", "context_zh": "..."}
       ],
-      "grammar": ["Present perfect tense"],
-      "notes": "..."
+      "grammar": [{"pattern": "Present perfect tense", "pattern_zh": "現在完成式", "explanation": "...", "explanation_zh": "...", "examples": [...], "examples_zh": [...]}],"notes": "...",
+      "notes_zh": "..."
     }
   ],
   "overall_difficulty": "B1",
   "estimated_time": "2 hours"
 }
 ```
+
+**Note**: All vocabulary, grammar, and notes attributes have corresponding Traditional Chinese (`_zh`) translations.
 
 #### 5.3 Vocabulary Extraction
 - Extract difficult words from transcript

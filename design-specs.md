@@ -60,6 +60,32 @@
 
 **Single User** - No authentication required.
 **No Background Task Queue** - All processing is immediate async I/O.
+**Language** - ALL Chinese text must be Traditional Chinese (繁體中文). No Simplified Chinese allowed.
+
+---
+
+## Language Requirements
+
+### Mandatory Traditional Chinese (繁體中文)
+
+**ALL Chinese text throughout the entire application MUST use Traditional Chinese. No Simplified Chinese is allowed.**
+
+This rule applies to:
+- All LLM-generated content (study plans, vocabulary definitions, grammar explanations, feedback)
+- User-facing text in frontend UI
+- Any Chinese explanations, notes, or feedback
+- API responses containing Chinese text
+- Any documentation or inline comments in Chinese
+
+**LLM Prompt Requirements**:
+All LLM prompts must explicitly instruct the model to respond in Traditional Chinese when generating Chinese content. Every prompt that may result in Chinese output must include:
+
+```
+IMPORTANT: When generating any Chinese text (definitions, explanations, notes, feedback),
+you MUST use Traditional Chinese (繁體中文). Do NOT use Simplified Chinese.
+Examples of Traditional Chinese: 是、開發、學習、詞彙、語法
+Examples to AVOID (Simplified): 是、开发、学习、词汇、语法
+```
 
 ---
 
