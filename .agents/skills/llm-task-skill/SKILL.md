@@ -6,6 +6,16 @@ LLM integration using llama-cpp-python with fixed Qwen3.5-2B-Q4_K_M model for st
 ## When to Use
 Use this skill when integrating LLMs, generating study plans, or implementing chat with teacher features.
 
+## Language Rule
+
+**MANDATORY: ALL Chinese text must be Traditional Chinese (繁體中文). No Simplified Chinese allowed.**
+
+Every LLM prompt that may generate Chinese content MUST include this instruction:
+```
+IMPORTANT: When generating any Chinese text (definitions, explanations, notes, feedback),
+you MUST use Traditional Chinese (繁體中文). Do NOT use Simplified Chinese.
+```
+
 ## Guidelines
 
 ### Architecture
@@ -111,12 +121,17 @@ class StudyPlanService:
     generate a structured study plan with learning objectives, key vocabulary with CEFR levels,
     grammar points, cultural notes, and estimated study time.
 
+    IMPORTANT: All Chinese text MUST be Traditional Chinese (繁體中文). No Simplified Chinese.
+    When generating vocabulary definitions, grammar explanations, or any Chinese notes,
+    use Traditional Chinese characters only. Examples: 是、開發、學習、詞彙、語法
+
     Respond ONLY with valid JSON in this exact format:
     {
         "objectives": ["string"],
-        "vocabulary": [{"word": "string", "definition": "string", "cefr": "A1|A2|B1|B2|C1|C2", "context": "string"}],
-        "grammar": ["string"],
-        "cultural_notes": "string",
+        "vocabulary": [{"word": "string", "word_zh": "string (Traditional Chinese)", "definition": "string (English)", "definition_zh": "string (Traditional Chinese)", "example": "string (English)", "example_zh": "string (Traditional Chinese)", "cefr": "A1|A2|B1|B2|C1|C2", "difficulty": "easy|medium|hard", "difficulty_zh": "簡單|中等|困難"}],
+        "grammar": [{"pattern": "string", "pattern_zh": "string (Traditional Chinese)", "explanation": "string (English)", "explanation_zh": "string (Traditional Chinese)", "examples": ["sentence using the grammar pattern", "another sentence using the pattern"], "examples_zh": ["使用該語法結構的例句（繁體中文）", "另一個使用該語法結構的例句（繁體中文）"]}],
+        "cultural_notes": "string (English)",
+        "cultural_notes_zh": "string (Traditional Chinese)",
         "estimated_time": "string",
         "overall_difficulty": "A1|A2|B1|B2|C1|C2"
     }"""
@@ -176,8 +191,12 @@ async def chat_with_teacher(
     context: Optional[str] = None
 ) -> str:
     """Conversational response with optional video context."""
-    system_prompt = """You are a friendly English teacher helping users learn English through video content.
-Be encouraging, provide examples, and correct mistakes gently."""
+system_prompt = """You are a friendly English teacher helping users learn English through video content.
+    Be encouraging, provide examples, and correct mistakes gently.
+
+    IMPORTANT: All Chinese text MUST be in Traditional Chinese (繁體中文). No Simplified Chinese.
+    When explaining vocabulary, grammar, or providing feedback in Chinese, use Traditional Chinese characters only.
+    Examples: 是、開發、學習、詞彙、語法"""
 
     if context:
         system_prompt += f"\n\nCurrent study context:\n{context}"
