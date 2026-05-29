@@ -67,6 +67,9 @@ class LLMService:
 
         self._model = Llama(
             model_path=str(self.model_path),
+            chat_template_kwargs={
+                "enable_thinking": False
+            },  # Disable thinking mode for Qwen models.
             n_ctx=n_ctx,
             n_threads=n_threads,
             n_gpu_layers=config["n_gpu_layers"],
@@ -111,8 +114,11 @@ Transcript (first 4000 chars): {transcript_text[:4000]}
 Generate a study plan in the following JSON format:
 {{
     "title": "Descriptive study plan title",
+    "title_zh": "描述性學習計劃標題（繁體中文）",
     "overall_difficulty": "beginner|intermediate|advanced",
+    "overall_difficulty_zh": "初級|中級|高級",
     "estimated_time": "e.g., 45 minutes",
+    "estimated_time_zh": "例如：45分鐘",
     "vocabulary": [
         {{
             "word": "important word or phrase",
@@ -151,6 +157,8 @@ Generate a study plan in the following JSON format:
     "notes_zh": "給學習者的額外教學筆記（繁體中文）"
 }}
 
+CRITICAL REQUIREMENT: Every text/string field in the JSON output MUST have a corresponding Chinese translation field with "_zh" suffix. This applies to ALL nested objects including vocabulary items, grammar items, and chunk objects. Do NOT omit any translation fields.
+
 Only return the JSON, no other text. Ensure the JSON is complete and valid."""
 
         messages = [
@@ -162,7 +170,9 @@ Only return the JSON, no other text. Ensure the JSON is complete and valid."""
         try:
             response = await self._generate_response(messages)
             study_plan = self._parse_json_response(response)
-            validated_plan = self._validate_study_plan(study_plan, video_title, video_duration)
+            validated_plan = self._validate_study_plan(
+                study_plan, video_title, video_duration
+            )
             timings["llm_inference_seconds"] = time.perf_counter() - inference_start
             logger.info(
                 f"[LLM Timing] init={timings['llm_init_seconds']:.2f}s, "
@@ -204,7 +214,7 @@ Only return the JSON, no other text. Ensure the JSON is complete and valid."""
             self._model.reset()
             response = self._model.create_chat_completion(
                 messages=messages,
-                max_tokens=4096,
+                max_tokens=8192,
                 temperature=0.3,
                 top_p=0.9,
                 repeat_penalty=1.1,
@@ -248,20 +258,67 @@ Only return the JSON, no other text. Ensure the JSON is complete and valid."""
                     return json.loads(json_str)
                 except json.JSONDecodeError:
                     pass
-            logger.warning(f"Failed to parse LLM response: {e}, response length: {len(response)}")
+            logger.warning(
+                f"Failed to parse LLM response: {e}, response length: {len(response)}"
+            )
             logger.warning(f"Raw LLM response (first 1000 chars): {response[:1000]}")
             logger.warning(f"Raw LLM response (last 500 chars): {response[-500:]}")
             raise
 
-    def _validate_study_plan(self, plan: dict, video_title: str, video_duration: float) -> dict:
+    def _validate_study_plan(
+        self, plan: dict, video_title: str, video_duration: float
+    ) -> dict:
         """Validate and fill in missing fields with defaults."""
+        vocabulary = []
+        for item in plan.get("vocabulary", []):
+            validated_item = {
+                "word": item.get("word", ""),
+                "word_zh": item.get("word_zh", ""),
+                "definition": item.get("definition", ""),
+                "definition_zh": item.get("definition_zh", ""),
+                "example": item.get("example", ""),
+                "example_zh": item.get("example_zh", ""),
+                "difficulty": item.get("difficulty", "medium"),
+                "difficulty_zh": item.get("difficulty_zh", "中等"),
+            }
+            vocabulary.append(validated_item)
+
+        grammar = []
+        for item in plan.get("grammar", []):
+            validated_item = {
+                "pattern": item.get("pattern", ""),
+                "pattern_zh": item.get("pattern_zh", ""),
+                "explanation": item.get("explanation", ""),
+                "explanation_zh": item.get("explanation_zh", ""),
+                "examples": item.get("examples", []),
+                "examples_zh": item.get("examples_zh", []),
+            }
+            grammar.append(validated_item)
+
+        chunks = []
+        for item in plan.get("chunks", []):
+            validated_item = {
+                "chunk_index": item.get("chunk_index", 0),
+                "time_range": item.get("time_range", ""),
+                "summary": item.get("summary", ""),
+                "summary_zh": item.get("summary_zh", ""),
+                "key_points": item.get("key_points", []),
+                "key_points_zh": item.get("key_points_zh", []),
+                "practice_suggestions": item.get("practice_suggestions", []),
+                "practice_suggestions_zh": item.get("practice_suggestions_zh", []),
+            }
+            chunks.append(validated_item)
+
         validated = {
             "title": plan.get("title", f"Study Plan: {video_title}"),
+            "title_zh": plan.get("title_zh", ""),
             "overall_difficulty": plan.get("overall_difficulty", "intermediate"),
+            "overall_difficulty_zh": plan.get("overall_difficulty_zh", "中級"),
             "estimated_time": plan.get("estimated_time", "30 minutes"),
-            "vocabulary": plan.get("vocabulary", []),
-            "grammar": plan.get("grammar", []),
-            "chunks": plan.get("chunks", []),
+            "estimated_time_zh": plan.get("estimated_time_zh", "30分鐘"),
+            "vocabulary": vocabulary,
+            "grammar": grammar,
+            "chunks": chunks,
             "notes": plan.get("notes", ""),
             "notes_zh": plan.get("notes_zh", ""),
         }
