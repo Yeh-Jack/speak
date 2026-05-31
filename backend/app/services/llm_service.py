@@ -4,7 +4,7 @@ import asyncio
 import json
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, AsyncGenerator
 
 from app.core.config import settings, LLM_MODEL_PATH
 from app.core.logging import get_logger
@@ -223,6 +223,39 @@ Only return the JSON, no other text. Ensure the JSON is complete and valid."""
             return response["choices"][0]["message"]["content"].strip()
 
         return await asyncio.to_thread(_call_llm)
+
+    async def stream_response(
+        self,
+        messages: list[dict],
+    ) -> AsyncGenerator[str, None]:
+        """Stream LLM response token by token.
+
+        Args:
+            messages: List of message dicts with 'role' and 'content'
+
+        Yields:
+            Response tokens one at a time
+        """
+        self._ensure_model()
+
+        def _stream_tokens():
+            self._model.reset()
+            response = self._model.create_chat_completion(
+                messages=messages,
+                max_tokens=8192,
+                temperature=0.3,
+                top_p=0.9,
+                repeat_penalty=1.1,
+                stop=["```", "```\n"],
+                stream=True,
+            )
+            for chunk in response:
+                delta = chunk["choices"][0]["delta"]
+                if "content" in delta:
+                    yield delta["content"]
+
+        for token in await asyncio.to_thread(_stream_tokens):
+            yield token
 
     def _parse_json_response(self, response: str) -> dict:
         """Extract and parse JSON from LLM response."""
