@@ -54,57 +54,60 @@ SQLite3 | llama-cpp-python (in-backend)
 ```
 backend/
 ├── app/
-│   ├── main.py                    # FastAPI entry point
-│   ├── config.py                  # Configuration (Pydantic settings)
-│   ├── logging.py                 # Logging setup
+│   ├── main.py                   # FastAPI entry point
+│   ├── config.py                 # Configuration (Pydantic settings)
+│   ├── logging.py                # Logging setup
 │   │
 │   ├── api/v1/
 │   │   ├── router.py             # API router
 │   │   └── endpoints/
 │   │       ├── videos.py         # Video endpoints
 │   │       ├── courses.py        # Course endpoints
+│   │       ├── chat.py           # Chat/AI tutor endpoints
 │   │       └── ...
 │   │
 │   ├── core/                     # Core functionality
 │   │   ├── config.py             # Settings, DATA_DIR, paths
 │   │   └── logging.py            # Structured logging
 │   │
-│   ├── db/                        # Database layer
+│   ├── db/                       # Database layer
 │   │   ├── base.py               # Base model class
 │   │   ├── session.py            # Async session
 │   │   └── init_db.py            # DB initialization
 │   │
-│   ├── models/                    # SQLAlchemy models
+│   ├── models/                   # SQLAlchemy models
 │   │   ├── video.py              # Video model
 │   │   ├── chunk.py              # VideoChunk model
 │   │   ├── transcript.py         # Transcript model
 │   │   ├── study_plan.py         # StudyPlan model
 │   │   └── vocabulary.py         # Vocabulary model
 │   │
-│   ├── schemas/                   # Pydantic schemas
+│   ├── schemas/                  # Pydantic schemas
 │   │   ├── video.py
 │   │   ├── transcript.py
+│   │   ├── chat.py
 │   │   └── ...
 │   │
-│   ├── repositories/              # Data access layer
+│   ├── repositories/             # Data access layer
 │   │   ├── video.py
 │   │   ├── chunk.py
 │   │   └── ...
 │   │
-│   ├── services/                  # Business logic
+│   ├── services/                 # Business logic
 │   │   ├── video_service.py      # Orchestrator with state machine
 │   │   ├── download_service.py   # YouTube download (yt-dlp)
 │   │   ├── chunking_service.py   # Hybrid Dynamic sentence-snap
 │   │   ├── transcription_service.py # YouTube subs + Whisper
-│   │   ├── llm_service.py       # llama-cpp-python integration
+│   │   ├── llm_service.py        # llama-cpp-python integration
+│   │   ├── chat_service.py       # AI tutor chat service
 │   │   └── exceptions.py         # Custom exceptions
 │   │
 │   └── utils/
 │       └── gpu_utils.py          # GPU detection & configuration
 │
-├── alembic/                       # Database migrations
-├── tests/                         # Test suite
-└── pyproject.toml                 # Project config (uv)
+├── alembic/                      # Database migrations
+├── tests/                        # Test suite
+└── pyproject.toml                # Project config (uv)
 ```
 
 ---
@@ -213,6 +216,34 @@ CREATE TABLE study_plans (
 | `PUT` | `/api/v1/courses/{id}/videos/reorder` | Reorder videos |
 | `POST` | `/api/v1/courses/{id}/start` | Start learning course |
 
+### Chat Endpoints (AI Tutor)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/chat` | Streaming chat (SSE) |
+
+**Request:**
+```json
+{
+    "video_id": "uuid (optional)",
+    "messages": [{"role": "user", "content": "..."}],
+    "system_prompt": "optional override"
+}
+```
+
+**Streaming Response (SSE):**
+```
+data: {"token": "Hello", "done": false}\n\n
+data: {"token": " world", "done": false}\n\n
+...
+data: {"token": "", "done": true}\n\n
+```
+
+**Error Format:**
+```
+data: {"error": "error message"}\n\n
+```
+
 ---
 
 ## Services Layer
@@ -280,6 +311,24 @@ Located: `app/services/llm_service.py`
 - **Estimated limit: ~3-5 minutes** of video content per study plan
 - Longer videos: Only the first ~3-5 minutes are used for study plan generation
 - For full video coverage, consider future chunked study plan approach
+
+**Streaming Support:**
+- `stream_response(messages)` - Yields tokens one at a time for real-time UI
+
+### ChatService
+Located: `app/services/chat_service.py`
+
+AI tutor service for conversational learning with streaming support:
+
+- **Streaming**: `stream_chat(messages)` - Yields tokens via SSE
+
+**Features:**
+- Optional video context from Whisper transcript (first 100 segments)
+- Customizable system prompt via `system_prompt` parameter
+- Lazy-loaded llama-cpp-python model (shared with LLMService in single-user mode)
+
+**System Prompt (default):**
+Acts as an expert English tutor helping students learn from video content, answering vocabulary/grammar questions, explaining idioms, and providing practice suggestions.
 
 ---
 

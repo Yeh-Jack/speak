@@ -1,5 +1,8 @@
 cd /workspaces/education/backend
 
+# 0. Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
 # 1. Run tests.
 uv run pytest tests/unit/ -v
 
@@ -40,13 +43,37 @@ curl -X PATCH "http://localhost:8000/api/v1/videos/{video_id}" \
 # 9. Retry downloading:
 curl -X POST "http://localhost:8000/api/v1/videos/{video_id}/retry"
 
-
-
-# 6. Get video chunks
+# 10. Get video chunks
 curl http://localhost:8000/api/v1/videos/{video_id}/chunks
 
-# 7. Test retry endpoint (simulate failure recovery)
-curl -X POST http://localhost:8000/api/v1/videos/{video_id}/retry
+# 11. Testing Chat API with curl
+   A. Test non-streaming SSE (via curl):
+      curl -X POST http://localhost:8000/api/v1/chat \
+        -H "Content-Type: application/json" \
+        -d '{
+          "messages": [
+            {"role": "user", "content": "Explain the word 'speculative'."}
+          ]
+        }'
+   B. Test with video context (video_id optional):
+      curl -X POST http://localhost:8000/api/v1/chat \
+        -H "Content-Type: application/json" \
+        -d '{
+          "video_id": "YOUR-UUID-HERE",
+          "messages": [
+            {"role": "user", "content": "Explain the vocabulary in this video"}
+          ]
+        }'
+   C. Test streaming with curl's -N (no buffer) for real-time tokens:
+      curl -X POST http://localhost:8000/api/v1/chat \
+        -H "Content-Type: application/json" \
+        -H "Accept: text/event-stream" \
+        -d '{
+          "messages": [
+            {"role": "user", "content": "Hello, explain grammar points"}
+          ]
+        }' -N
+
 
 # 8. Verify Storage Files
 ls -la /workspaces/education/data/videos/      # Downloaded video (.webm)
@@ -74,3 +101,16 @@ A. The prompt is too long and there's not enough room for the full processing / 
    1. Max_tokens=8192
    2. Transcript is explicitly truncated to first 4000 characters
    3. Video length limit: ~3-5 minutes of content per study plan
+
+B. SSE (Server-Sent Events) - A server-push technology where the server sends data to the client over HTTP, one-way communication.
+   Use case for this project:
+    - The single HTTP request stays open and the server pushes data chunks through it. No new connection needed.
+    - Backend sends tokens one-by-one as LLM generates them
+    - Frontend displays text in real-time (like ChatGPT streaming)
+    - Simple to implement with FastAPI's StreamingResponse
+   How it works:
+   Client (Vue) ───HTTP request───▶ Backend
+        ▲                        │
+        │                        ▼
+        └───── SSE stream ◀───── LLM generates tokens
+   Alternative: WebSockets (bidirectional, more complex) - not needed since only server→client streaming is required.
