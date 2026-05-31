@@ -1,8 +1,8 @@
-# English Learning App - Agent Instructions
+# English Speaking Learning App - Agent Instructions
 
 ## Project Overview
 
-An AI-powered English education platform using LLM as a personalized teacher. Users provide YouTube URLs (movies, TV shows, TED talks) and the system generates personalized study plans and vocabulary lists. **Single-user application** - no authentication required.
+An AI-powered English learning platform using LLM as a personalized teacher. Users provide YouTube URLs (movies, TV shows, TED talks) and the system generates personalized study plans and vocabulary lists. **Single-user application** - no authentication required.
 
 ## Tech Stack
 
@@ -114,6 +114,9 @@ Located in `.agents/skills/`:
 - **Fixed Model**: Qwen3.5-2B-Q4_K_M.gguf
 - **Quantization**: Q4_K_M (GGUF format)
 - **Framework**: llama-cpp-python (Python bindings, no separate container)
+- **Context Size**: 8192 tokens
+- **Transcript Truncation**: 4000 characters (first portion only)
+- **Video Length Limit**: ~3-5 minutes of video content per study plan (due to context limit)
 - **GPU Support**: NVIDIA GPU detection and auto-configuration
 - **NVIDIA**: GPUtil + CUDA backend
 - **GPU Configuration**:

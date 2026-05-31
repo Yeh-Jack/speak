@@ -1697,11 +1697,7 @@ uv lock
 # GPU Configuration
 LLM_GPU_LAYERS=-1 # -1=auto-detect, 0=CPU, N=specific layers
 LLM_MODEL_SIZE=2B # 2B, 3B (for VRAM calculation)
-LLM_CONTEXT_SIZE=4096 # Model context window
-
-# llama-cpp-python will auto-detect backend:
-# NVIDIA -> CUDA
-# No GPU detected -> CPU
+LLM_CONTEXT_SIZE=8192 # Model context window (~3-5 min video per study plan)
 ```
 
 ### Usage in LLM Service
