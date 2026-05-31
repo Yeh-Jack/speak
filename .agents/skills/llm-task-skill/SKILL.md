@@ -302,7 +302,7 @@ The following are fixed system constants (not configurable via environment):
 # LLM (Fixed model - no switching)
 DEFAULT_MODEL=Qwen3.5-2B-Q4_K_M.gguf
 LLM_GPU_LAYERS=-1  # -1=auto, 0=CPU only, N=specific layers
-LLM_CONTEXT_SIZE=4096
+LLM_CONTEXT_SIZE=8192  # Model context window (~3-5 min video per study plan)
 LLM_THREADS=4
 ```
 
@@ -312,3 +312,4 @@ LLM_THREADS=4
 - **No task queue**: All processing is immediate async with await
 - **GPU auto-detection**: Automatically calculates optimal GPU layers based on VRAM
 - **Streaming supported**: Real-time token generation for chat endpoints
+- **Video length limit**: ~3-5 minutes per study plan (transcript truncated to 4000 chars)

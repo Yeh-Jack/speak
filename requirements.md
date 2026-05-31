@@ -1,10 +1,10 @@
-# English Learning App - Technical Specification
+# English Speaking Learning App - Technical Specification
 
 ## Project Overview
 
-An AI-powered English education platform using LLM as a personalized teacher. **Single-user application** - no authentication required. Users provide YouTube URLs (movies, TV shows, TED talks) and the system generates personalized study plans and vocabulary lists.
+An AI-powered English learning platform using LLM as a personalized teacher. **Single-user application** - no authentication required. Users provide YouTube URLs (movies, TV shows, TED talks) and the system generates personalized study plans and vocabulary lists.
 
-**Target Users**: Individual English learners seeking personalized, self-paced video-based education
+**Target Users**: Individual English learners seeking personalized, self-paced video-based learning
 
 **Key Differentiator**: Uses YouTube video content with AI-generated study plans and vocabulary lists. No exams - focus on learning, not testing.
 
@@ -516,7 +516,7 @@ PROJECT_ROOT=/app
 # LLM (llama-cpp-python) - Single fixed model
 DEFAULT_MODEL=Qwen3.5-2B-Q4_K_M.gguf
 LLM_GPU_LAYERS=-1             # -1=auto, 0=CPU only, N=specific layers
-LLM_CONTEXT_SIZE=4096         # Model context window
+LLM_CONTEXT_SIZE=8192         # Model context window (supports up to ~3-5 min video per study plan)
 LLM_THREADS=4                 # CPU threads for inference
 
 # YouTube Download
