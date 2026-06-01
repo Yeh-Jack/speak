@@ -57,9 +57,7 @@ class ChatService:
 
         self._model = Llama(
             model_path=str(model_path),
-            chat_template_kwargs={
-                "enable_thinking": False
-            },
+            chat_template_kwargs={"enable_thinking": False},
             n_ctx=n_ctx,
             n_threads=n_threads,
             n_gpu_layers=config["n_gpu_layers"],
@@ -88,6 +86,19 @@ class ChatService:
         full_messages = [{"role": "system", "content": system}] + messages
 
         def _stream_tokens():
+            """
+            When stream=True, create_chat_completion returns a generator that yields JSON chunks (dict objects)
+            from the LLM stream. Each chunk looks like:
+                {
+                    "choices": [{
+                        "delta": {"content": "Hello"},
+                        "finish_reason": None
+                    }],
+                    "usage": {...}  # may appear in later chunks
+                }
+            So line 112 iterates over these chunks as they arrive token-by-token from the LLM.
+            If stream=False, it would return the complete response as a single dict after waiting for entire generation.
+            """
             self._model.reset()
             response = self._model.create_chat_completion(
                 messages=full_messages,
@@ -102,7 +113,18 @@ class ChatService:
                 if "content" in delta:
                     yield delta["content"]
 
-        for token in await asyncio.to_thread(_stream_tokens):
+        def _get_next(gen):
+            try:
+                return next(gen)
+            except StopIteration:
+                return None
+
+        loop = asyncio.get_running_loop()
+        gen = await loop.run_in_executor(None, _stream_tokens)
+        while True:
+            token = await loop.run_in_executor(None, _get_next, gen)
+            if token is None:
+                break
             yield token
 
     async def shutdown(self) -> None:
