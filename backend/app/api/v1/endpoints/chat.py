@@ -3,7 +3,7 @@
 import json
 from typing import AsyncGenerator
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,7 +18,7 @@ router = APIRouter()
 @router.post("")
 async def chat(
     request: StreamChatRequest,
-    db: AsyncSession,
+    db: AsyncSession = Depends(get_db),
 ):
     """Streaming chat endpoint for AI tutor (SSE).
 
@@ -43,7 +43,9 @@ async def chat(
                 f"[{seg.get('start', 0):.1f}s] {seg.get('text', '')}"
                 for seg in transcript.segments[:100]
             )
-            video_context = f"\n\nVideo transcript context (first 100 segments):\n{segments_text}"
+            video_context = (
+                f"\n\nVideo transcript context (first 100 segments):\n{segments_text}"
+            )
 
     messages = []
     for msg in request.messages:
