@@ -60,6 +60,32 @@
 
 **Single User** - No authentication required.
 **No Background Task Queue** - All processing is immediate async I/O.
+**Language** - ALL Chinese text must be Traditional Chinese (繁體中文). No Simplified Chinese allowed.
+
+---
+
+## Language Requirements
+
+### Mandatory Traditional Chinese (繁體中文)
+
+**ALL Chinese text throughout the entire application MUST use Traditional Chinese. No Simplified Chinese is allowed.**
+
+This rule applies to:
+- All LLM-generated content (study plans, vocabulary definitions, grammar explanations, feedback)
+- User-facing text in frontend UI
+- Any Chinese explanations, notes, or feedback
+- API responses containing Chinese text
+- Any documentation or inline comments in Chinese
+
+**LLM Prompt Requirements**:
+All LLM prompts must explicitly instruct the model to respond in Traditional Chinese when generating Chinese content. Every prompt that may result in Chinese output must include:
+
+```
+IMPORTANT: When generating any Chinese text (definitions, explanations, notes, feedback),
+you MUST use Traditional Chinese (繁體中文). Do NOT use Simplified Chinese.
+Examples of Traditional Chinese: 是、開發、學習、詞彙、語法
+Examples to AVOID (Simplified): 是、开发、学习、词汇、语法
+```
 
 ---
 
@@ -809,6 +835,15 @@ duration FLOAT NOT NULL,
 chunk_duration FLOAT DEFAULT 300, -- User-adjustable: 60-600 seconds, default 300
 status VARCHAR(50) DEFAULT 'pending', -- pending, downloading, downloading_complete, chunking, chunking_complete, transcribing, transcribing_complete, studying, ready, failed
 error_message TEXT, -- Checkpoint-resume: stores error on failure
+
+-- Video metadata from YouTube
+thumbnail VARCHAR(500), -- Video thumbnail URL
+uploader VARCHAR(500), -- Channel name
+upload_date VARCHAR(20), -- Publication date (YYYYMMDD format)
+view_count INTEGER, -- Number of views
+like_count INTEGER, -- Number of likes
+metadata_json JSON, -- Additional data (categories, tags, language, subtitle languages, available formats)
+
 created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -1124,9 +1159,23 @@ POST /api/videos/youtube
          ↓
 ┌─────────────────────────────────────────────────────────────┐
 │ 4. Study Plan (LLM)                                         │
+│    Uses highest priority transcript: user > youtube_author > whisper > youtube_auto │
 │    Checkpoint: "studying" → "ready"                         │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+### Triple Transcript System
+
+The system maintains four types of transcripts with priority order:
+
+| Priority | Source | Description |
+|----------|--------|-------------|
+| 1 (Highest) | user | User-uploaded subtitles via `POST /api/videos/{id}/transcripts/user` |
+| 2 | youtube_author | YouTube creator-uploaded subtitles (from `subtitles` metadata) |
+| 3 | whisper | Whisper transcription (always generated) |
+| 4 (Lowest) | youtube_auto | YouTube auto-generated captions (from `automatic_captions` metadata) |
+
+Study plan generation automatically selects the highest priority available transcript.
 
 ### API Endpoints
 
@@ -1135,6 +1184,8 @@ POST /api/videos/youtube
 # GET /api/videos/{id} - Get video with current status
 # POST /api/videos/{id}/retry - Retry from last checkpoint
 # GET /api/videos/{id}/chunks - Get calculated chunks
+# GET /api/videos/{id}/transcripts/{type} - Get transcript (user, youtube_author, whisper, youtube_auto)
+# POST /api/videos/{id}/transcripts/user - Upload user subtitles (highest priority)
 ```
 
 ### Chunking Service Implementation
@@ -1646,11 +1697,7 @@ uv lock
 # GPU Configuration
 LLM_GPU_LAYERS=-1 # -1=auto-detect, 0=CPU, N=specific layers
 LLM_MODEL_SIZE=2B # 2B, 3B (for VRAM calculation)
-LLM_CONTEXT_SIZE=4096 # Model context window
-
-# llama-cpp-python will auto-detect backend:
-# NVIDIA -> CUDA
-# No GPU detected -> CPU
+LLM_CONTEXT_SIZE=8192 # Model context window (~3-5 min video per study plan)
 ```
 
 ### Usage in LLM Service
@@ -1764,6 +1811,7 @@ def get_cached_model(model_name: str):
 | 2025-04-24 | 4.0 | AI Assistant | Added video/audio format constraints (MP4/WebM, MP3/WebM) |
 | 2025-04-24 | 5.0 | AI Assistant | Removed Auth Service, Exam Service, user references; cleaned up React remnants |
 | 2026-04-26 | 6.0 | AI Assistant | Phase 2 design: Hybrid Dynamic chunking (±30s sentence snap), checkpoint-resume state machine, error_message field |
+| 2026-05-19 | 7.0 | AI Assistant | Added quadruple transcript system with priority: user > youtube_author > whisper > youtube_auto |
 
 ---
 

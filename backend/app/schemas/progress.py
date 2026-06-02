@@ -19,7 +19,7 @@ class StudyProgressBase(BaseModel):
 class StudyProgressCreate(StudyProgressBase):
     """Schema for creating study progress."""
 
-    user_id: uuid.UUID
+    pass
 
 
 class StudyProgressUpdate(BaseModel):
@@ -36,7 +36,6 @@ class StudyProgress(StudyProgressBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    user_id: uuid.UUID
     updated_at: datetime
 
 

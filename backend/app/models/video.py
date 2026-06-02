@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Float, String, Text
+from sqlalchemy import Float, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
@@ -30,6 +30,14 @@ class Video(Base, TimestampMixin):
     chunk_duration: Mapped[float] = mapped_column(Float, nullable=False, server_default="300.0")
     status: Mapped[str] = mapped_column(String(50), nullable=False, server_default="pending")
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    thumbnail: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    uploader: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    upload_date: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    view_count: Mapped[Optional[int]] = mapped_column(Float, nullable=True)
+    like_count: Mapped[Optional[int]] = mapped_column(Float, nullable=True)
+
+    metadata_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     chunks: Mapped[list["VideoChunk"]] = relationship(
         "VideoChunk", back_populates="video", cascade="all, delete-orphan", lazy="selectin"

@@ -1,5 +1,8 @@
 cd /workspaces/education/backend
 
+# 0. Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
 # 1. Run tests.
 uv run pytest tests/unit/ -v
 
@@ -29,14 +32,48 @@ This will:
 3. Generate transcript
 4. Return the complete video object
 
-# 5. Check video status
+# 7. Check video status
 curl http://localhost:8000/api/v1/videos/{video_id}
 
-# 6. Get video chunks
+# 8. Set video downloading status:
+curl -X PATCH "http://localhost:8000/api/v1/videos/{video_id}" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "chunking_complete"}'
+
+# 9. Retry downloading:
+curl -X POST "http://localhost:8000/api/v1/videos/{video_id}/retry"
+
+# 10. Get video chunks
 curl http://localhost:8000/api/v1/videos/{video_id}/chunks
 
-# 7. Test retry endpoint (simulate failure recovery)
-curl -X POST http://localhost:8000/api/v1/videos/{video_id}/retry
+# 11. Testing Chat API with curl
+   A. Test non-streaming SSE (via curl):
+      curl -X POST http://localhost:8000/api/v1/chat \
+        -H "Content-Type: application/json" \
+        -d '{
+          "messages": [
+            {"role": "user", "content": "Explain the word 'speculative'."}
+          ]
+        }'
+   B. Test with video context (video_id optional):
+      curl -X POST http://localhost:8000/api/v1/chat \
+        -H "Content-Type: application/json" \
+        -d '{
+          "video_id": "YOUR-UUID-HERE",
+          "messages": [
+            {"role": "user", "content": "Explain the vocabulary in this video"}
+          ]
+        }'
+   C. Test streaming with curl's -N (no buffer) for real-time tokens:
+curl -X POST http://localhost:8000/api/v1/chat \
+  -H "Content-Type: application/json" \
+  -H "Accept: text/event-stream" \
+  -d '{
+    "messages": [
+      {"role": "user", "content": "Explain the word 'speculative'."}
+    ]
+  }' -N
+
 
 # 8. Verify Storage Files
 ls -la /workspaces/education/data/videos/      # Downloaded video (.webm)
@@ -59,3 +96,62 @@ Check video status and error_message field:
 cd /workspaces/education
 sqlite3 data/db/learning.db "SELECT id, title, status, error_message FROM videos;"
 
+Issues :
+A. The prompt is too long and there's not enough room for the full processing / response.
+   1. Max_tokens=8192
+   2. Transcript is explicitly truncated to first 4000 characters
+   3. Video length limit: ~3-5 minutes of content per study plan
+
+B. SSE (Server-Sent Events) - A server-push technology where the server sends data to the client over HTTP, one-way communication.
+   Use case for this project:
+    - The single HTTP request stays open and the server pushes data chunks through it. No new connection needed.
+    - Backend sends tokens one-by-one as LLM generates them
+    - Frontend displays text in real-time (like ChatGPT streaming)
+    - Simple to implement with FastAPI's StreamingResponse
+   How it works:
+   Client (Vue) ───HTTP request───▶ Backend
+        ▲                        │
+        │                        ▼
+        └───── SSE stream ◀───── LLM generates tokens
+   Alternative: WebSockets (bidirectional, more complex) - not needed since only server→client streaming is required.
+   Key Design Pattern: Running a Blocking Generator in Async Context
+   The challenge: llama-cpp-python's create_chat_completion with stream=True is a blocking iterator
+   that must run in a thread to avoid blocking the event loop.
+
+1. Main async code calls loop.run_in_executor to run _stream_tokens in thread pool
+2. _stream_tokens is a generator that yields tokens from the LLM
+3. The while loop continuously pulls tokens using _get_next (also run in executor)
+4. Tokens are yielded back to the async caller
+I'll create a simple ASCII/text diagram.
+┌─────────────────────────────────────────────────────────────┐
+│                      Async Caller                           │
+└─────────────────────┬───────────────────────────────────────┘
+                      │ yields token
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│  while True:                                                │
+│    token = await loop.run_in_executor(None, _get_next, gen) │
+│    if token is None: break                                  │
+│    yield token                                              │
+└─────────────────────┬───────────────────────────────────────┘
+                      │ run in thread pool
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Thread Pool Executor (None = default)                      │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │  _get_next(gen)         _stream_tokens()               │ │
+│  │       │                        │                       │ │
+│  │       │                        ▼                       │ │
+│  │       │                 ┌──────────────┐               │ │
+│  │       │                 │  LLM Model   │               │ │
+│  │       │                 │  (blocking)  │               │ │
+│  │       │                 └──────┬───────┘               │ │
+│  │       │                        │                       │ │
+│  │       │◄───────── yields ──────┘                       │ │
+│  └───────┴────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+Flow:
+1. _stream_tokens runs in thread pool, blocking on LLM
+2. _get_next pulls next token from generator (also in thread pool)
+3. Main loop runs in async context, yielding tokens to caller
+4. When StopIteration occurs, _get_next returns None → break

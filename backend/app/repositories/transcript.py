@@ -33,7 +33,7 @@ class TranscriptRepository(BaseRepository[Transcript]):
         """Create a transcript for a video."""
         transcript = Transcript(
             video_id=str(video_id),
-            source=transcript_data.get("language", "youtube"),
+            source=transcript_data.get("source", "youtube"),
             segments=transcript_data.get("segments", []),
             full_text=transcript_data.get("full_text"),
             language=transcript_data.get("language"),

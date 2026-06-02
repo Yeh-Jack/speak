@@ -1,4 +1,4 @@
-# English Learning App - System Architecture
+# English Speaking Learning App - System Architecture
 
 ## Table of Contents
 
@@ -16,8 +16,8 @@
 
 ## System Overview
 
-**Project**: AI-Powered English Learning Platform
-**Purpose**: Personalized English learning through YouTube videos (movies, TV shows, TED talks)
+**Project**: AI-Powered English Speaking Learning Platform
+**Purpose**: Personalized English speaking learning through YouTube videos (movies, TV shows, TED talks)
 **Approach**: Users provide YouTube URLs → System generates study plans, vocabulary lists, and speaking practice
 **User Model**: Single-user application (no authentication)
 
