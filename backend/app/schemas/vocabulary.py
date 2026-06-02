@@ -18,7 +18,7 @@ class VocabularyBase(BaseModel):
 class VocabularyCreate(VocabularyBase):
     """Schema for creating vocabulary."""
 
-    user_id: uuid.UUID
+    pass
 
 
 class VocabularyUpdate(BaseModel):
@@ -35,7 +35,6 @@ class Vocabulary(VocabularyBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    user_id: uuid.UUID
     review_count: int
     next_review: date | None
     interval: int

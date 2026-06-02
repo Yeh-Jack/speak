@@ -1,6 +1,6 @@
-# English Learning App
+# English Speaking Learning App
 
-AI-powered English education platform using LLM as a personalized teacher.
+AI-powered English learning platform using LLM as a personalized teacher.
 
 ## Overview
 

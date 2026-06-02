@@ -32,7 +32,7 @@ class DownloadService:
         Returns:
             dict with video info including:
                 - video_path: Path to downloaded video file
-                - subtitle_paths: List of subtitle file paths
+                - subtitle_paths: Dict with 'author' and 'auto' subtitle paths
                 - title, duration, etc.
 
         Raises:
@@ -51,13 +51,16 @@ class DownloadService:
             raise DownloadError(f"Download completed but file not found: {video_path}")
 
         logger.info(f"Video downloaded successfully: {video_path}")
-        logger.info(f"Subtitles downloaded: {info.get('subtitle_paths', [])}")
+        logger.info(
+            f"Author subtitles downloaded: {info.get('subtitle_paths', {}).get('author', [])}"
+        )
+        logger.info(f"Auto subtitles downloaded: {info.get('subtitle_paths', {}).get('auto', [])}")
         return info
 
     def _download_sync(self, youtube_url: str, video_id: str) -> dict:
         """Synchronous download using yt-dlp.
 
-        Downloads video and auto-generated subtitles simultaneously.
+        Downloads video and both author-uploaded and auto-generated subtitles.
         Subtitles are saved to the subtitles/ folder after download.
         The transcription service will look for them during processing.
 
@@ -74,7 +77,7 @@ class DownloadService:
             | `lrc`           | Lyric format              | Karaoke/audio sync      |
 
         Returns:
-            dict with video info including 'subtitle_paths' list
+            dict with video info including 'subtitle_paths' dict with 'author' and 'auto' keys
         """
         video_output = str(self.videos_dir / video_id)
         video_path = self.videos_dir / f"{video_id}.webm"
@@ -106,15 +109,15 @@ class DownloadService:
             logger.error(f"Video file not found after download")
             raise DownloadError("Video file not found after download - download may have failed")
 
-        subtitle_paths = []
+        subtitle_paths = {"author": [], "auto": []}
         for lang in subtitleslangs:
             for ext in ["json3", "vtt", "srt", "ass", "lrc"]:
                 path = self.videos_dir / f"{video_id}.{lang}.{ext}"
                 if path.exists():
-                    subtitle_paths.append(str(path))
                     moved_path = self.subtitles_dir / f"{video_id}.{lang}.{ext}"
                     path.rename(moved_path)
-                    logger.info(f"Moved subtitle to: {moved_path}")
+                    subtitle_paths["author"].append(str(moved_path))
+                    logger.info(f"Moved author subtitle to: {moved_path}")
 
         info["subtitle_paths"] = subtitle_paths
         info["video_path"] = str(video_path)
@@ -136,7 +139,17 @@ class DownloadService:
             return {"title": "Unknown", "duration": 0.0}
 
     def _get_info_sync(self, youtube_url: str) -> dict:
-        """Synchronous info extraction using yt-dlp."""
+        """Synchronous info extraction using yt-dlp.
+
+        Note on YouTube subtitles:
+        - 'subtitles' (author-uploaded): Subtitles that were manually uploaded by the content creator
+          These are generally more accurate and properly timed.
+        - 'automatic_captions' (auto-generated): YouTube's automatic speech recognition generated captions
+          These are available when creator hasn't uploaded subtitles, may be less accurate.
+
+        Returns:
+            dict with video metadata including 'subtitles' and 'automatic_captions' lists
+        """
         ydl_opts = {
             "quiet": True,
             "no_warnings": True,

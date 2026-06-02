@@ -48,10 +48,10 @@ class GPUInfo:
     total_memory_mb: float
     free_memory_mb: float
     used_memory_mb: float
+    backend: GPUBackend
     load_percent: float = 0.0
     temperature_celsius: float | None = None
     driver_version: str | None = None
-    backend: GPUBackend
     is_available: bool = True
 
 

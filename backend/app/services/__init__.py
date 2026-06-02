@@ -12,6 +12,7 @@ from app.services.transcription_service import (
     WhisperTranscriptionService,
 )
 from app.services.video_service import VideoService
+from app.services.llm_service import LLMService
 from app.services.exceptions import (
     VideoProcessingError,
     DownloadError,
@@ -33,6 +34,8 @@ __all__ = [
     "WhisperTranscriptionService",
     # Video orchestrator
     "VideoService",
+    # LLM
+    "LLMService",
     # Exceptions
     "VideoProcessingError",
     "DownloadError",

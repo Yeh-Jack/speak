@@ -1,12 +1,37 @@
-# English Learning App - Technical Specification
+# English Speaking Learning App - Technical Specification
 
 ## Project Overview
 
-An AI-powered English education platform using LLM as a personalized teacher. **Single-user application** - no authentication required. Users provide YouTube URLs (movies, TV shows, TED talks) and the system generates personalized study plans and vocabulary lists.
+An AI-powered English learning platform using LLM as a personalized teacher. **Single-user application** - no authentication required. Users provide YouTube URLs (movies, TV shows, TED talks) and the system generates personalized study plans and vocabulary lists.
 
-**Target Users**: Individual English learners seeking personalized, self-paced video-based education
+**Target Users**: Individual English learners seeking personalized, self-paced video-based learning
 
 **Key Differentiator**: Uses YouTube video content with AI-generated study plans and vocabulary lists. No exams - focus on learning, not testing.
+
+---
+
+## Language Requirements
+
+### Mandatory Traditional Chinese (繁體中文)
+
+**ALL Chinese text throughout the entire application MUST use Traditional Chinese. No Simplified Chinese is allowed.**
+
+This rule applies to:
+- All LLM-generated content (study plans, vocabulary definitions, grammar explanations, feedback)
+- User-facing text in frontend UI
+- Any Chinese explanations, notes, or feedback
+- API responses containing Chinese text
+- Any documentation or inline comments in Chinese
+
+**LLM Prompt Requirements**:
+All LLM prompts must explicitly instruct the model to respond in Traditional Chinese when generating Chinese content. Example instruction to include:
+
+```
+IMPORTANT: When generating any Chinese text (definitions, explanations, notes, feedback),
+you MUST use Traditional Chinese (繁體中文). Do NOT use Simplified Chinese.
+Examples of Traditional Chinese: 是、開發、學習、詞彙、語法
+Examples to AVOID (Simplified): 是、开发、学习、词汇、语法
+```
 
 ---
 
@@ -38,6 +63,7 @@ An AI-powered English education platform using LLM as a personalized teacher. **
 - **Safety Buffer**: Leaves 1GB VRAM free for other operations
 - **Streaming**: Supported for real-time token generation
 - **No Model Switching** - Single fixed model only
+- **Language Rule**: **ALL Chinese text must be Traditional Chinese (繁體中文)** - No Simplified Chinese allowed. This applies to all LLM-generated content, user-facing text, and any Chinese feedback or explanations.
 
 ---
 
@@ -108,15 +134,28 @@ In Docker: PROJECT_ROOT is `/app`, so data is at `/app/data/`
 
 **Note**: No physical chunk files - chunks are virtual with timestamps into the original video. Chunks snap to sentence boundaries.
 
+**Video Metadata Storage**: When downloading a video, the following metadata is stored in SQLite:
+- `thumbnail` - Video thumbnail URL
+- `uploader` - Channel name  
+- `upload_date` - Publication date (YYYYMMDD format)
+- `view_count` - Number of views
+- `like_count` - Number of likes
+- `metadata_json` - Additional data (categories, tags, language, available formats, subtitle languages)
+
 ---
 
 ### 2. Subtitle/Transcript Processing
 
 #### 2.1 Subtitle/Transcript Strategy
-- **Simultaneous download**: Video and auto-generated subtitles downloaded together via yt-dlp (for reference/supplement only)
+- **Quadruple transcript system**: Four types of subtitles (user-uploaded, youtube_author, youtube_auto, whisper)
+- **Subtitle priority**: user > youtube_author > whisper > youtube_auto (user-uploaded has highest priority for study plan)
+- **YouTube author subtitles** (subtitles field): Creator-uploaded, generally more accurate and properly timed
+- **YouTube auto captions** (automatic_captions field): YouTube's ASR-generated captions, less accurate
+- **Simultaneous download**: Video and auto-generated subtitles downloaded together via yt-dlp
 - **Subtitles storage**: Saved to `subtitles/` folder with language suffix (e.g., `video_id.en.json3`)
 - **Always use Whisper**: Transcription is always done via Whisper, regardless of YouTube subtitles availability
 - **YouTube subtitles**: Downloaded but only used as supplementary reference, NOT for transcription (accuracy not guaranteed)
+- **User-uploaded**: Users can upload their own subtitles via API endpoint `POST /api/videos/{id}/transcripts/user`
 - **Transcribe before chunk**: Transcript is generated first, then used for sentence-aware chunk boundary detection
 
 ---
@@ -213,16 +252,18 @@ class VideoCourseItem:
       "end": "05:00",
       "objectives": ["Learn 10 new vocabulary words"],
       "vocabulary": [
-        {"word": "innovation", "definition": "...", "cefr": "B2", "context": "..."}
+        {"word": "innovation", "word_zh": "創新", "definition": "...", "definition_zh": "...", "cefr": "B2", "cefr_zh": "B2", "context": "...", "context_zh": "..."}
       ],
-      "grammar": ["Present perfect tense"],
-      "notes": "..."
+      "grammar": [{"pattern": "Present perfect tense", "pattern_zh": "現在完成式", "explanation": "...", "explanation_zh": "...", "examples": [...], "examples_zh": [...]}],"notes": "...",
+      "notes_zh": "..."
     }
   ],
   "overall_difficulty": "B1",
   "estimated_time": "2 hours"
 }
 ```
+
+**Note**: All vocabulary, grammar, and notes attributes have corresponding Traditional Chinese (`_zh`) translations.
 
 #### 5.3 Vocabulary Extraction
 - Extract difficult words from transcript
@@ -475,7 +516,7 @@ PROJECT_ROOT=/app
 # LLM (llama-cpp-python) - Single fixed model
 DEFAULT_MODEL=Qwen3.5-2B-Q4_K_M.gguf
 LLM_GPU_LAYERS=-1             # -1=auto, 0=CPU only, N=specific layers
-LLM_CONTEXT_SIZE=4096         # Model context window
+LLM_CONTEXT_SIZE=8192         # Model context window (supports up to ~3-5 min video per study plan)
 LLM_THREADS=4                 # CPU threads for inference
 
 # YouTube Download

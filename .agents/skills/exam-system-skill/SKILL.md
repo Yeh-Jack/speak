@@ -6,6 +6,16 @@ Spaced repetition learning with SM-2 algorithm, adaptive testing, and multiple q
 ## When to Use
 Use this skill when implementing the exam system, SM-2 algorithm, question generation, or spaced repetition review.
 
+## Language Rule
+
+**MANDATORY: ALL Chinese text must be Traditional Chinese (繁體中文). No Simplified Chinese allowed.**
+
+Every LLM prompt that may generate Chinese content MUST include this instruction:
+```
+IMPORTANT: When generating any Chinese text (explanations, feedback, question content),
+you MUST use Traditional Chinese (繁體中文). Do NOT use Simplified Chinese.
+```
+
 ## Guidelines
 
 ### SM-2 Algorithm
@@ -318,6 +328,10 @@ class ExamGenerationService:
     SYSTEM_PROMPT = """You are an expert English teacher creating adaptive tests.
 Generate exam questions based on the provided vocabulary and transcript.
 
+IMPORTANT: All Chinese text MUST be Traditional Chinese (繁體中文). No Simplified Chinese.
+When providing explanations, feedback, or any Chinese content, use Traditional Chinese only.
+Examples: 是、開發、學習、詞彙、語法
+
 Create questions covering:
 - Vocabulary meaning and usage
 - Grammar concepts from the context
@@ -328,10 +342,12 @@ Respond ONLY with valid JSON array of questions in this format:
 [
     {
         "type": "multiple_choice|fill_blank|dictation|speaking|translation",
-        "question": "string",
+        "question": "string (English)",
+        "question_zh": "string (Traditional Chinese)",
         "options": ["A", "B", "C", "D"],  // For multiple_choice only
         "correct_answer": "string",
-        "explanation": "string",
+        "explanation": "string (English)",
+        "explanation_zh": "string (Traditional Chinese)",
         "difficulty": "A1|A2|B1|B2|C1|C2",
         "video_timestamp": 45.5  // Optional - timestamp in seconds
     }

@@ -33,7 +33,7 @@ class Settings(BaseSettings):
 
     DEFAULT_MODEL: str = "Qwen3.5-2B-Q4_K_M.gguf"
     LLM_GPU_LAYERS: str = "-1"
-    LLM_CONTEXT_SIZE: int = 4096
+    LLM_CONTEXT_SIZE: int = 8192
     LLM_THREADS: int = 4
 
     YOUTUBE_DOWNLOAD_QUALITY: int = 720

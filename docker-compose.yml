@@ -6,7 +6,7 @@ services:
     environment:
       - DEFAULT_MODEL=Qwen3.5-2B-Q4_K_M.gguf
       - LLM_GPU_LAYERS=${LLM_GPU_LAYERS:--1}
-      - LLM_CONTEXT_SIZE=4096
+      - LLM_CONTEXT_SIZE=8192
       - YOUTUBE_DOWNLOAD_QUALITY=720
       - YOUTUBE_AUDIO_QUALITY=128k
       - CHUNK_DURATION=300

@@ -276,7 +276,6 @@ chunk_*
 *.gguf
 *.bin
 *.safetensors
-models/
 *.onnx
 *.pt
 *.pth
