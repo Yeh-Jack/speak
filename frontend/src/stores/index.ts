@@ -1,1 +1,1 @@
-export {};
+export { useVideoStore } from './video.store';
