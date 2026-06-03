@@ -8,6 +8,19 @@ export interface Video {
     duration: number;
     chunk_duration: number;
     status: string;
+    thumbnail?: string;
+    uploader?: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface CourseVideo {
+    id: string;
+    course_id: string;
+    video_id: string;
+    order_index: number;
+    video?: Video;
+    study_plan?: StudyPlan | null;
     created_at: string;
     updated_at: string;
 }
@@ -31,6 +44,7 @@ export interface Course {
     description: string | null;
     status: string;
     current_video_index: number;
+    course_videos: CourseVideo[];
     created_at: string;
     updated_at: string;
 }

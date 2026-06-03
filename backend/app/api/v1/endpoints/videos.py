@@ -146,6 +146,8 @@ async def create_video_from_youtube(
 
     try:
         video, timings = await video_service.process_video(video.id)
+        await db.commit()
+        await db.refresh(video)
         return VideoResponse(
             video=video,
             chunks=video.chunks,
@@ -300,6 +302,36 @@ async def get_chunk_audio(
         media_type="audio/mpeg",
         filename=f"chunk_{chunk_index}.mp3",
     )
+
+
+@router.get("/{video_id}/stream")
+async def stream_video(
+    video_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Stream video file.
+
+    Args:
+        video_id: Video UUID
+
+    Returns:
+        Video file (webm or mp4)
+    """
+    video_repo = VideoRepository(db)
+    video = await video_repo.get_by_id(video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    video_id_str = str(video_id)
+    for ext in ["webm", "mp4"]:
+        video_path = DATA_DIR / "videos" / f"{video_id_str}.{ext}"
+        if video_path.exists():
+            return FileResponse(
+                path=video_path,
+                media_type=f"video/{ext}",
+            )
+
+    raise HTTPException(status_code=404, detail="Video file not found")
 
 
 @router.get("/{video_id}/transcripts/{transcript_type}")

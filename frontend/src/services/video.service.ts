@@ -17,6 +17,11 @@ export interface TranscriptResponse {
 }
 
 export const videoService = {
+  async getAllVideos(): Promise<Video[]> {
+    const response = await api.get<Video[]>('/videos');
+    return response.data;
+  },
+
   async getVideo(id: string): Promise<Video> {
     const response = await api.get<Video>(`/videos/${id}`);
     return response.data;
@@ -50,8 +55,8 @@ export const videoService = {
     return response.data;
   },
 
-  async createFromYouTube(url: string): Promise<VideoResponse> {
-    const response = await api.post<VideoResponse>('/videos/youtube', { url });
+  async createFromYouTube(youtubeUrl: string): Promise<VideoResponse> {
+    const response = await api.post<VideoResponse>('/videos/youtube', { youtube_url: youtubeUrl });
     return response.data;
   },
 
