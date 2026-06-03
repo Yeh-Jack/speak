@@ -17,10 +17,15 @@ curl -X POST http://localhost:8080/api/v1/videos/info \
   -H "Content-Type: application/json" \
   -d '{"youtube_url": "https://www.youtube.com/watch?v=SPGn9MZb1a0"}'
 
+House of the Dragon Season 3 : https://www.youtube.com/watch?v=i6w7O1kwuBk
+Lilith : https://www.youtube.com/watch?v=Lf2UZXrFVtY
+Medusa : https://www.youtube.com/watch?v=3OSkg0JudmU
+Toy Story 5 : https://www.youtube.com/watch?v=fh7MTAQGxEg
+
 # 4. Create video from YouTube (test with a short video)
 curl -X POST http://localhost:8080/api/v1/videos/youtube \
   -H "Content-Type: application/json" \
-  -d '{"youtube_url": "https://www.youtube.com/watch?v=SPGn9MZb1a0", "chunk_duration": 30}'
+  -d '{"youtube_url": "https://www.youtube.com/watch?v=H4nJo-oqAro", "chunk_duration": 30}'
 
 # 5. List videos
 curl http://localhost:8080/api/v1/videos

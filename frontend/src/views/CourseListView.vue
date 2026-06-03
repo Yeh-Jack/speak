@@ -1,55 +1,33 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { courseService } from '@/services/course.service';
+import type { Course } from '@/types';
 
 const router = useRouter();
 
-const courses = ref([
-  {
-    id: '1',
-    title: 'English for Beginners',
-    description: 'Start your English learning journey with essential vocabulary and grammar',
-    thumbnail: 'https://picsum.photos/seed/course1/640/360',
-    videoCount: 12,
-    duration: '2h 30m',
-    progress: 35,
-    videos: [
-      { id: '1', title: 'Basic Greetings', duration: '8:30', thumbnail: 'https://picsum.photos/seed/v1/320/180' },
-      { id: '2', title: 'Numbers and Counting', duration: '10:15', thumbnail: 'https://picsum.photos/seed/v2/320/180' },
-      { id: '3', title: 'Days of the Week', duration: '7:45', thumbnail: 'https://picsum.photos/seed/v3/320/180' },
-    ],
-  },
-  {
-    id: '2',
-    title: 'Business English',
-    description: 'Professional vocabulary and communication skills for the workplace',
-    thumbnail: 'https://picsum.photos/seed/course2/640/360',
-    videoCount: 8,
-    duration: '3h 15m',
-    progress: 0,
-    videos: [],
-  },
-  {
-    id: '3',
-    title: 'IELTS Preparation',
-    description: 'Comprehensive preparation for the IELTS exam',
-    thumbnail: 'https://picsum.photos/seed/course3/640/360',
-    videoCount: 20,
-    duration: '8h 00m',
-    progress: 0,
-    videos: [],
-  },
-  {
-    id: '4',
-    title: 'Daily Conversations',
-    description: 'Natural English phrases for everyday situations',
-    thumbnail: 'https://picsum.photos/seed/course4/640/360',
-    videoCount: 15,
-    duration: '4h 45m',
-    progress: 0,
-    videos: [],
-  },
-]);
+const courses = ref<Course[]>([]);
+const isLoading = ref(false);
+const error = ref<string | null>(null);
+
+function formatDuration(duration: number): string {
+  const hours = Math.floor(duration / 3600);
+  const mins = Math.floor((duration % 3600) / 60);
+  if (hours > 0) {
+    return `${hours}h ${mins}m`;
+  }
+  return `${mins}m`;
+}
+
+function getCourseProgress(course: Course): number {
+  if (!course.course_videos || course.course_videos.length === 0) return 0;
+  const completed = course.course_videos.filter((cv, idx) => idx < course.current_video_index).length;
+  return Math.round((completed / course.course_videos.length) * 100);
+}
+
+function getVideoCount(course: Course): number {
+  return course.course_videos?.length || 0;
+}
 
 function goToCourse(courseId: string) {
   router.push(`/courses/${courseId}`);
@@ -58,6 +36,22 @@ function goToCourse(courseId: string) {
 function goToVideo(videoId: string) {
   router.push(`/videos/${videoId}`);
 }
+
+async function fetchCourses() {
+  isLoading.value = true;
+  error.value = null;
+  try {
+    courses.value = await courseService.getCourses();
+  } catch (err: any) {
+    error.value = err.response?.data?.detail || err.message || 'Failed to load courses';
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+onMounted(() => {
+  fetchCourses();
+});
 </script>
 
 <template>
@@ -96,7 +90,22 @@ function goToVideo(videoId: string) {
         </p>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div v-if="isLoading" class="flex items-center justify-center py-12">
+        <div class="animate-spin w-8 h-8 border-4 border-learning-accent-primary border-t-transparent rounded-full"></div>
+      </div>
+
+      <div v-else-if="error" class="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-red-400 mb-6">
+        {{ error }}
+      </div>
+
+      <div v-else-if="courses.length === 0" class="bg-learning-surface rounded-xl border border-learning-bg-tertiary p-8 text-center">
+        <svg class="w-12 h-12 text-learning-text-muted mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+        </svg>
+        <p class="text-learning-text-secondary mb-4">No courses yet.</p>
+      </div>
+
+      <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div
           v-for="course in courses"
           :key="course.id"
@@ -104,9 +113,9 @@ function goToVideo(videoId: string) {
           class="bg-learning-surface rounded-xl overflow-hidden border border-learning-bg-tertiary cursor-pointer card-interactive group"
         >
           <div class="relative aspect-video bg-learning-bg-primary">
-            <img :src="course.thumbnail" :alt="course.title" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
-            <div v-if="course.progress > 0" class="absolute top-3 right-3 px-2 py-1 bg-black/70 rounded text-xs text-white font-medium">
-              {{ course.progress }}% complete
+            <img :src="`https://picsum.photos/seed/${course.id}/640/360`" :alt="course.title" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+            <div v-if="getCourseProgress(course) > 0" class="absolute top-3 right-3 px-2 py-1 bg-black/70 rounded text-xs text-white font-medium">
+              {{ getCourseProgress(course) }}% complete
             </div>
           </div>
           <div class="p-5">
@@ -114,32 +123,26 @@ function goToVideo(videoId: string) {
               {{ course.title }}
             </h3>
             <p class="text-learning-text-secondary text-sm mb-4">
-              {{ course.description }}
+              {{ course.description || 'No description' }}
             </p>
             <div class="flex items-center gap-4 text-sm text-learning-text-muted">
               <span class="flex items-center gap-1">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
-                {{ course.videoCount }} videos
-              </span>
-              <span class="flex items-center gap-1">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {{ course.duration }}
+                {{ getVideoCount(course) }} videos
               </span>
             </div>
 
-            <div v-if="course.progress > 0" class="mt-4">
+            <div v-if="getCourseProgress(course) > 0" class="mt-4">
               <div class="flex justify-between text-sm mb-1">
                 <span class="text-learning-text-secondary">Progress</span>
-                <span class="text-learning-text-primary">{{ course.progress }}%</span>
+                <span class="text-learning-text-primary">{{ getCourseProgress(course) }}%</span>
               </div>
               <div class="h-1.5 bg-learning-bg-primary rounded-full overflow-hidden">
                 <div
                   class="h-full bg-learning-accent-primary rounded-full transition-all"
-                  :style="{ width: `${course.progress}%` }"
+                  :style="{ width: `${getCourseProgress(course)}%` }"
                 />
               </div>
             </div>
