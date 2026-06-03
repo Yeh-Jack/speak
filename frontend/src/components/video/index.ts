@@ -1,1 +1,1 @@
-// Video components will be exported here
+export { default as VideoPlayer } from './VideoPlayer.vue';

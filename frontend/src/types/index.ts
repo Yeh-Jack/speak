@@ -44,3 +44,61 @@ export interface Vocabulary {
     review_count: number;
     next_review: string | null;
 }
+
+export interface TranscriptSegment {
+    start: number;
+    end: number;
+    text: string;
+}
+
+export interface Transcript {
+    id: string;
+    video_id: string;
+    type: 'user' | 'youtube_author' | 'whisper' | 'youtube_auto';
+    language: string;
+    segments: TranscriptSegment[];
+    created_at: string;
+}
+
+export interface StudyObjective {
+    id: string;
+    title: string;
+    description: string;
+    completed: boolean;
+    type: 'vocabulary' | 'grammar' | 'pronunciation' | 'listening' | 'speaking';
+}
+
+export interface StudyPlan {
+    id: string;
+    video_id: string;
+    chunk_index: number;
+    objectives: StudyObjective[];
+    vocabulary: VocabularyItem[];
+    grammar: GrammarItem[];
+    totalChunks: number;
+    completedChunks: number;
+    estimatedMinutes: number;
+    created_at: string;
+}
+
+export interface StudyPlanDisplay {
+    objectives: StudyObjective[];
+    totalChunks: number;
+    completedChunks: number;
+    estimatedMinutes: number;
+}
+
+export interface VocabularyItem {
+    word: string;
+    definition: string;
+    context: string;
+    cefr_level: string;
+    pronunciation?: string;
+    examples?: string[];
+}
+
+export interface GrammarItem {
+    pattern: string;
+    explanation: string;
+    examples: string[];
+}
