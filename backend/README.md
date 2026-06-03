@@ -50,7 +50,7 @@ uv run alembic upgrade head
 
 4. Start the development server:
 ```bash
-uv run uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
 ```
 
 ### Docker Setup
@@ -79,8 +79,8 @@ In Docker: PROJECT_ROOT is `/app`, so data is at `/app/data/`
 
 ## API Documentation
 
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+- Swagger UI: http://localhost:8080/docs
+- ReDoc: http://localhost:8080/redoc
 
 ## Video Processing States
 

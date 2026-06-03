@@ -111,9 +111,9 @@ class GPUManager:
     def _detect_nvidia(self) -> bool:
         """Detect NVIDIA GPUs using GPUtil."""
         try:
-            import gputil
+            from GPUtil import GPUtil
 
-            gpus = gputil.getGPUs()
+            gpus = GPUtil.getGPUs()
             if not gpus:
                 return False
 

@@ -2,7 +2,7 @@
 name = "english-learning-backend"
 version = "0.1.0"
 description = "AI-powered English education platform backend"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
@@ -30,7 +30,7 @@ dependencies = [
     "aiosqlite>=0.19.0",
     "alembic>=1.13.0",
     # LLM - llama-cpp-python with GPU support
-    # NVIDIA (CUDA): uv pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121
+    # NVIDIA (CUDA): uv pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu125
     "llama-cpp-python>=0.3.23",
     # GPU detection - NVIDIA and AMD support
     "gputil>=1.4.0",
@@ -86,9 +86,9 @@ dev = [
 [tool.uv.pip]
 # Extra index URLs for GPU-accelerated packages
 extra-index-url = [
-    # Uncomment for NVIDIA GPU support
-    # "https://abetlen.github.io/llama-cpp-python/whl/cu121",
-    # Uncomment for AMD GPU support
+    # NVIDIA GPU support (CUDA 12.5)
+    "https://abetlen.github.io/llama-cpp-python/whl/cu125",
+    # AMD GPU support
     # "https://abetlen.github.io/llama-cpp-python/whl/rocm62",
 ]
 

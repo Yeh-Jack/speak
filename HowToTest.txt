@@ -1,29 +1,32 @@
+==========   Backend   ==========
 cd /workspaces/education/backend
 
-# 0. Install uv
+# 0. Install uv and initiate virtual environment.
 curl -LsSf https://astral.sh/uv/install.sh | sh
+uv venv
+uv pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu125
 
 # 1. Run tests.
 uv run pytest tests/unit/ -v
 
 # 2. Start the backend server.
-uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
 
 # 3. Get video information
-curl -X POST http://localhost:8000/api/v1/videos/info \
+curl -X POST http://localhost:8080/api/v1/videos/info \
   -H "Content-Type: application/json" \
   -d '{"youtube_url": "https://www.youtube.com/watch?v=SPGn9MZb1a0"}'
 
 # 4. Create video from YouTube (test with a short video)
-curl -X POST http://localhost:8000/api/v1/videos/youtube \
+curl -X POST http://localhost:8080/api/v1/videos/youtube \
   -H "Content-Type: application/json" \
   -d '{"youtube_url": "https://www.youtube.com/watch?v=SPGn9MZb1a0", "chunk_duration": 30}'
 
 # 5. List videos
-curl http://localhost:8000/api/v1/videos
+curl http://localhost:8080/api/v1/videos
 
 # 6. Delete video
-curl -X DELETE http://localhost:8000/api/v1/videos/{video_id}} \
+curl -X DELETE http://localhost:8080/api/v1/videos/{video_id}} \
   -H "Content-Type: application/json"
 
 This will:
@@ -33,10 +36,10 @@ This will:
 4. Return the complete video object
 
 # 7. Check video status
-curl http://localhost:8000/api/v1/videos/{video_id}
+curl http://localhost:8080/api/v1/videos/{video_id}
 
 # 8. Set video downloading status:
-curl -X PATCH "http://localhost:8000/api/v1/videos/{video_id}" \
+curl -X PATCH "http://localhost:8080/api/v1/videos/{video_id}" \
   -H "Content-Type: application/json" \
   -d '{"status": "chunking_complete"}'
 
@@ -44,11 +47,11 @@ curl -X PATCH "http://localhost:8000/api/v1/videos/{video_id}" \
 curl -X POST "http://localhost:8000/api/v1/videos/{video_id}/retry"
 
 # 10. Get video chunks
-curl http://localhost:8000/api/v1/videos/{video_id}/chunks
+curl http://localhost:8080/api/v1/videos/{video_id}/chunks
 
 # 11. Testing Chat API with curl
    A. Test non-streaming SSE (via curl):
-      curl -X POST http://localhost:8000/api/v1/chat \
+      curl -X POST http://localhost:8080/api/v1/chat \
         -H "Content-Type: application/json" \
         -d '{
           "messages": [
@@ -56,7 +59,7 @@ curl http://localhost:8000/api/v1/videos/{video_id}/chunks
           ]
         }'
    B. Test with video context (video_id optional):
-      curl -X POST http://localhost:8000/api/v1/chat \
+      curl -X POST http://localhost:8080/api/v1/chat \
         -H "Content-Type: application/json" \
         -d '{
           "video_id": "YOUR-UUID-HERE",
@@ -65,7 +68,7 @@ curl http://localhost:8000/api/v1/videos/{video_id}/chunks
           ]
         }'
    C. Test streaming with curl's -N (no buffer) for real-time tokens:
-curl -X POST http://localhost:8000/api/v1/chat \
+curl -X POST http://localhost:8080/api/v1/chat \
   -H "Content-Type: application/json" \
   -H "Accept: text/event-stream" \
   -d '{
@@ -82,27 +85,36 @@ ls -la /workspaces/education/data/audios/      # Temp audio (deleted after Whisp
 
 # 9. Test Error Handling
 Submit invalid YouTube URL
-curl -X POST http://localhost:8000/api/v1/videos/youtube \
+curl -X POST http://localhost:8080/api/v1/videos/youtube \
   -H "Content-Type: application/json" \
   -d '{"youtube_url": "https://invalid-url.com/video"}'
 Check that status is failed and error_message is set:
 {"status": "failed", "error_message": "..."}
 
 # 10. Retry failed video
-curl -X POST http://localhost:8000/api/v1/videos/{video_id}/retry
+curl -X POST http://localhost:8080/api/v1/videos/{video_id}/retry
 
 # 11. Database Verification
 Check video status and error_message field:
 cd /workspaces/education
 sqlite3 data/db/learning.db "SELECT id, title, status, error_message FROM videos;"
 
-Issues :
+==========   Frontend   ==========
+cd frontend && pnpm dev to start the dev server.
+
+==========   Issues   ==========
 A. The prompt is too long and there's not enough room for the full processing / response.
    1. Max_tokens=8192
    2. Transcript is explicitly truncated to first 4000 characters
    3. Video length limit: ~3-5 minutes of content per study plan
 
-B. SSE (Server-Sent Events) - A server-push technology where the server sends data to the client over HTTP, one-way communication.
+B. NVIDIA driver installation notes:
+   1. Use newest NVIDIA driver.
+   2. Choose appropriate version of CUDA-tools-kit based on the GPU you have.
+      ex: CUDA-12.5 for Tesla P100.
+   3. Install the llama-cpp-python with the corresponding cuda (tools-kit) version.
+      ex: uv pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu125
+C. SSE (Server-Sent Events) - A server-push technology where the server sends data to the client over HTTP, one-way communication.
    Use case for this project:
     - The single HTTP request stays open and the server pushes data chunks through it. No new connection needed.
     - Backend sends tokens one-by-one as LLM generates them

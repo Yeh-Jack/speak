@@ -31,7 +31,7 @@ docker-compose up -d
 
 Access:
 - Frontend: http://localhost:5173
-- Backend API: http://localhost:8000/docs
+- Backend API: http://localhost:8080/docs
 
 ### Local Development
 
@@ -39,7 +39,7 @@ Access:
 ```bash
 cd backend
 uv sync
-uv run uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
 ```
 
 **Frontend:**

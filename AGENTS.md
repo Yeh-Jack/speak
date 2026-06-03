@@ -306,10 +306,10 @@ uv add package-name
 uv add --dev package-name
 
 # Run the application
-uv run uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
 
 # Run with specific Python version
-uv run --python 3.13 uvicorn app.main:app --reload
+uv run --python 3.13 uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
 
 # Run tests
 uv run pytest
