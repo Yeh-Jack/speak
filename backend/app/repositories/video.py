@@ -18,6 +18,8 @@ class VideoRepository(BaseRepository[Video]):
 
     async def get_with_chunks(self, id: UUID) -> Video | None:
         """Get video with its chunks."""
+        if isinstance(id, UUID):
+            id = str(id)
         result = await self.session.execute(
             select(Video).where(Video.id == id).options(selectinload(Video.chunks))
         )

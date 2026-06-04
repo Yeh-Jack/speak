@@ -416,3 +416,129 @@ async def upload_user_transcript(
         "segments_count": len(transcript.segments) if transcript.segments else 0,
         "message": "User transcript uploaded successfully. It will be used for study plan generation.",
     }
+
+
+@router.get("/{video_id}/study-plans", response_model=list[dict])
+async def get_video_study_plans(
+    video_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get all study plans for a video.
+
+    Args:
+        video_id: Video UUID
+
+    Returns:
+        List of study plans (overall + chunk-specific)
+    """
+    study_plan_repo = StudyPlanRepository(db)
+    study_plans = await study_plan_repo.get_all_by_video_id(video_id)
+
+    return [
+        {
+            "id": str(sp.id),
+            "video_id": str(sp.video_id),
+            "chunk_index": sp.chunk_index,
+            "objectives": sp.objectives or [],
+            "vocabulary": sp.vocabulary or [],
+            "grammar": sp.grammar or [],
+            "notes": sp.notes,
+            "overall_difficulty": sp.overall_difficulty,
+            "estimated_time": sp.estimated_time,
+            "created_at": sp.created_at.isoformat() if sp.created_at else None,
+        }
+        for sp in study_plans
+    ]
+
+
+@router.get("/{video_id}/study-plans/{chunk_index}", response_model=dict)
+async def get_study_plan_by_chunk(
+    video_id: UUID,
+    chunk_index: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get study plan for a specific chunk.
+
+    Args:
+        video_id: Video UUID
+        chunk_index: Index of the chunk (-1 for overall plan)
+
+    Returns:
+        Study plan for the chunk
+    """
+    study_plan_repo = StudyPlanRepository(db)
+
+    if chunk_index == -1:
+        study_plan = await study_plan_repo.get_by_video_id(video_id)
+    else:
+        study_plan = await study_plan_repo.get_by_video_and_chunk(video_id, chunk_index)
+
+    if not study_plan:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Study plan not found for video {video_id} chunk {chunk_index}",
+        )
+
+    return {
+        "id": str(study_plan.id),
+        "video_id": str(study_plan.video_id),
+        "chunk_index": study_plan.chunk_index,
+        "objectives": study_plan.objectives or [],
+        "vocabulary": study_plan.vocabulary or [],
+        "grammar": study_plan.grammar or [],
+        "notes": study_plan.notes,
+        "overall_difficulty": study_plan.overall_difficulty,
+        "estimated_time": study_plan.estimated_time,
+        "created_at": study_plan.created_at.isoformat() if study_plan.created_at else None,
+    }
+
+
+@router.patch("/{video_id}/study-plans/{chunk_index}", response_model=dict)
+async def update_study_plan_objective(
+    video_id: UUID,
+    chunk_index: int,
+    update_data: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    """Update a study plan objective (e.g., mark as completed).
+
+    Args:
+        video_id: Video UUID
+        chunk_index: Index of the chunk (-1 for overall plan)
+        update_data: Dictionary containing objective updates
+
+    Returns:
+        Updated study plan
+    """
+    study_plan_repo = StudyPlanRepository(db)
+
+    if chunk_index == -1:
+        study_plan = await study_plan_repo.get_by_video_id(video_id)
+    else:
+        study_plan = await study_plan_repo.get_by_video_and_chunk(video_id, chunk_index)
+
+    if not study_plan:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Study plan not found for video {video_id} chunk {chunk_index}",
+        )
+
+    if "objectives" in update_data:
+        study_plan.objectives = update_data["objectives"]
+    if "notes" in update_data:
+        study_plan.notes = update_data["notes"]
+
+    await study_plan_repo.save(study_plan)
+
+    return {
+        "id": str(study_plan.id),
+        "video_id": str(study_plan.video_id),
+        "chunk_index": study_plan.chunk_index,
+        "objectives": study_plan.objectives or [],
+        "vocabulary": study_plan.vocabulary or [],
+        "grammar": study_plan.grammar or [],
+        "notes": study_plan.notes,
+        "overall_difficulty": study_plan.overall_difficulty,
+        "estimated_time": study_plan.estimated_time,
+        "updated": True,
+    }
