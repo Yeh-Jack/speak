@@ -18,6 +18,8 @@ class CourseRepository(BaseRepository[Course]):
 
     async def get_with_videos(self, id: UUID) -> Course | None:
         """Get course with its videos."""
+        if isinstance(id, UUID):
+            id = str(id)
         result = await self.session.execute(
             select(Course)
             .where(Course.id == id)
@@ -39,6 +41,8 @@ class CourseVideoRepository(BaseRepository[CourseVideo]):
 
     async def get_by_course_id(self, course_id: UUID) -> list[CourseVideo]:
         """Get all course videos for a course."""
+        if isinstance(course_id, UUID):
+            course_id = str(course_id)
         result = await self.session.execute(
             select(CourseVideo)
             .where(CourseVideo.course_id == course_id)
@@ -48,6 +52,10 @@ class CourseVideoRepository(BaseRepository[CourseVideo]):
 
     async def get_by_course_and_video(self, course_id: UUID, video_id: UUID) -> CourseVideo | None:
         """Get a specific course video."""
+        if isinstance(course_id, UUID):
+            course_id = str(course_id)
+        if isinstance(video_id, UUID):
+            video_id = str(video_id)
         result = await self.session.execute(
             select(CourseVideo).where(
                 CourseVideo.course_id == course_id, CourseVideo.video_id == video_id
@@ -59,6 +67,8 @@ class CourseVideoRepository(BaseRepository[CourseVideo]):
         """Delete all course videos for a course."""
         from sqlalchemy import delete
 
+        if isinstance(course_id, UUID):
+            course_id = str(course_id)
         result = await self.session.execute(
             delete(CourseVideo).where(CourseVideo.course_id == course_id)
         )

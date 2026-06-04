@@ -17,6 +17,8 @@ class StudyPlanRepository(BaseRepository[StudyPlan]):
 
     async def get_by_video_id(self, video_id: UUID) -> StudyPlan | None:
         """Get study plan for a video (overall plan, chunk_index is null)."""
+        if isinstance(video_id, UUID):
+            video_id = str(video_id)
         result = await self.session.execute(
             select(StudyPlan).where(StudyPlan.video_id == video_id, StudyPlan.chunk_index.is_(None))
         )
@@ -24,6 +26,8 @@ class StudyPlanRepository(BaseRepository[StudyPlan]):
 
     async def get_by_video_and_chunk(self, video_id: UUID, chunk_index: int) -> StudyPlan | None:
         """Get study plan for a specific chunk."""
+        if isinstance(video_id, UUID):
+            video_id = str(video_id)
         result = await self.session.execute(
             select(StudyPlan).where(
                 StudyPlan.video_id == video_id, StudyPlan.chunk_index == chunk_index
@@ -33,6 +37,8 @@ class StudyPlanRepository(BaseRepository[StudyPlan]):
 
     async def get_all_by_video_id(self, video_id: UUID) -> list[StudyPlan]:
         """Get all study plans for a video (including chunk-specific)."""
+        if isinstance(video_id, UUID):
+            video_id = str(video_id)
         result = await self.session.execute(
             select(StudyPlan).where(StudyPlan.video_id == video_id).order_by(StudyPlan.chunk_index)
         )
