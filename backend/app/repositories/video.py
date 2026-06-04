@@ -27,6 +27,8 @@ class VideoRepository(BaseRepository[Video]):
 
     async def get_with_relations(self, id: UUID) -> Video | None:
         """Get video with all relations."""
+        if isinstance(id, UUID):
+            id = str(id)
         result = await self.session.execute(
             select(Video)
             .where(Video.id == id)

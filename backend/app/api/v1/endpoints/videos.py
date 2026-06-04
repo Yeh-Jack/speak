@@ -30,6 +30,46 @@ from app.services.download_service import DownloadService
 router = APIRouter()
 
 
+def _transform_vocabulary_item(item: dict) -> dict:
+    """Transform vocabulary item from database format to frontend format."""
+    return {
+        "word": item.get("word", ""),
+        "definition": item.get("definition", ""),
+        "context": item.get("example", ""),
+        "cefr_level": item.get("difficulty", "").upper() if item.get("difficulty") else "",
+        "pronunciation": item.get("pronunciation", ""),
+        "examples": [item.get("example", "")] if item.get("example") else [],
+    }
+
+
+def _transform_grammar_item(item: dict) -> dict:
+    """Transform grammar item from database format to frontend format."""
+    return {
+        "pattern": item.get("pattern", ""),
+        "explanation": item.get("explanation", ""),
+        "examples": item.get("examples", []) or [],
+    }
+
+
+def _transform_study_plan(sp) -> dict:
+    """Transform study plan from database model to API response format."""
+    vocabulary = sp.vocabulary or []
+    grammar = sp.grammar or []
+
+    return {
+        "id": str(sp.id),
+        "video_id": str(sp.video_id),
+        "chunk_index": sp.chunk_index,
+        "objectives": sp.objectives or [],
+        "vocabulary": [_transform_vocabulary_item(v) for v in vocabulary],
+        "grammar": [_transform_grammar_item(g) for g in grammar],
+        "notes": sp.notes,
+        "overall_difficulty": sp.overall_difficulty,
+        "estimated_time": sp.estimated_time,
+        "created_at": sp.created_at.isoformat() if sp.created_at else None,
+    }
+
+
 def get_video_service(db: AsyncSession) -> VideoService:
     """Dependency for VideoService."""
     return VideoService(
@@ -434,21 +474,7 @@ async def get_video_study_plans(
     study_plan_repo = StudyPlanRepository(db)
     study_plans = await study_plan_repo.get_all_by_video_id(video_id)
 
-    return [
-        {
-            "id": str(sp.id),
-            "video_id": str(sp.video_id),
-            "chunk_index": sp.chunk_index,
-            "objectives": sp.objectives or [],
-            "vocabulary": sp.vocabulary or [],
-            "grammar": sp.grammar or [],
-            "notes": sp.notes,
-            "overall_difficulty": sp.overall_difficulty,
-            "estimated_time": sp.estimated_time,
-            "created_at": sp.created_at.isoformat() if sp.created_at else None,
-        }
-        for sp in study_plans
-    ]
+    return [_transform_study_plan(sp) for sp in study_plans]
 
 
 @router.get("/{video_id}/study-plans/{chunk_index}", response_model=dict)
@@ -479,18 +505,7 @@ async def get_study_plan_by_chunk(
             detail=f"Study plan not found for video {video_id} chunk {chunk_index}",
         )
 
-    return {
-        "id": str(study_plan.id),
-        "video_id": str(study_plan.video_id),
-        "chunk_index": study_plan.chunk_index,
-        "objectives": study_plan.objectives or [],
-        "vocabulary": study_plan.vocabulary or [],
-        "grammar": study_plan.grammar or [],
-        "notes": study_plan.notes,
-        "overall_difficulty": study_plan.overall_difficulty,
-        "estimated_time": study_plan.estimated_time,
-        "created_at": study_plan.created_at.isoformat() if study_plan.created_at else None,
-    }
+    return _transform_study_plan(study_plan)
 
 
 @router.patch("/{video_id}/study-plans/{chunk_index}", response_model=dict)

@@ -17,6 +17,8 @@ class ChunkRepository(BaseRepository[VideoChunk]):
 
     async def get_by_video_id(self, video_id: UUID) -> list[VideoChunk]:
         """Get all chunks for a video."""
+        if isinstance(video_id, UUID):
+            video_id = str(video_id)
         result = await self.session.execute(
             select(VideoChunk)
             .where(VideoChunk.video_id == video_id)
@@ -26,6 +28,8 @@ class ChunkRepository(BaseRepository[VideoChunk]):
 
     async def get_by_video_and_index(self, video_id: UUID, chunk_index: int) -> VideoChunk | None:
         """Get a specific chunk by video ID and index."""
+        if isinstance(video_id, UUID):
+            video_id = str(video_id)
         result = await self.session.execute(
             select(VideoChunk).where(
                 VideoChunk.video_id == video_id, VideoChunk.chunk_index == chunk_index
@@ -35,6 +39,8 @@ class ChunkRepository(BaseRepository[VideoChunk]):
 
     async def delete_by_video_id(self, video_id: UUID) -> int:
         """Delete all chunks for a video and return count."""
+        if isinstance(video_id, UUID):
+            video_id = str(video_id)
         result = await self.session.execute(
             delete(VideoChunk).where(VideoChunk.video_id == video_id)
         )

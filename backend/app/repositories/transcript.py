@@ -17,6 +17,8 @@ class TranscriptRepository(BaseRepository[Transcript]):
 
     async def get_by_video_id(self, video_id: UUID) -> Transcript | None:
         """Get transcript for a video."""
+        if isinstance(video_id, UUID):
+            video_id = str(video_id)
         result = await self.session.execute(
             select(Transcript).where(Transcript.video_id == video_id)
         )
@@ -24,6 +26,8 @@ class TranscriptRepository(BaseRepository[Transcript]):
 
     async def get_by_video_and_source(self, video_id: UUID, source: str) -> Transcript | None:
         """Get transcript by video ID and source."""
+        if isinstance(video_id, UUID):
+            video_id = str(video_id)
         result = await self.session.execute(
             select(Transcript).where(Transcript.video_id == video_id, Transcript.source == source)
         )
