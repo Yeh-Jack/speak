@@ -73,7 +73,7 @@ onMounted(() => {
           </router-link>
           <span class="text-learning-text-muted">/</span>
           <router-link to="/courses" class="text-learning-text-secondary hover:text-learning-text-primary transition-colors">
-            Courses
+            Courses / 課程
           </router-link>
           <span class="text-learning-text-muted">/</span>
           <span class="text-learning-text-primary">{{ course?.title || 'Loading...' }}</span>
@@ -86,7 +86,7 @@ onMounted(() => {
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
             </svg>
-            Back
+            Back / 返回
           </button>
         </div>
       </div>
@@ -122,7 +122,7 @@ onMounted(() => {
               {{ course.title }}
             </h1>
             <p class="text-learning-text-secondary mb-6">
-              {{ course.description || 'No description' }}
+              {{ course.description || 'No description / 無描述' }}
             </p>
 
             <div class="flex items-center gap-6 mb-8">
@@ -130,22 +130,22 @@ onMounted(() => {
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
-                {{ videoCount }} videos
+                {{ videoCount }} videos / 影片
               </span>
               <span class="flex items-center gap-2 text-sm text-learning-text-secondary">
                 <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                {{ completedCount }}/{{ videoCount }} completed
+                {{ completedCount }}/{{ videoCount }} completed / 完成
               </span>
             </div>
 
             <h2 class="text-lg font-semibold font-display text-learning-text-primary mb-4">
-              Course Content
+              Course Content / 課程內容
             </h2>
 
             <div v-if="!course.course_videos || course.course_videos.length === 0" class="text-center py-8 text-learning-text-secondary">
-              No videos in this course yet.
+              No videos in this course yet. / 此課程尚無影片。
             </div>
 
             <div v-else class="space-y-3">
@@ -189,11 +189,11 @@ onMounted(() => {
           <div>
             <div class="bg-learning-surface rounded-xl border border-learning-bg-tertiary p-5 mb-6">
               <h3 class="text-lg font-semibold font-display text-learning-text-primary mb-4">
-                Your Progress
+                Your Progress / 您的進度
               </h3>
               <div class="mb-4">
                 <div class="flex justify-between text-sm mb-2">
-                  <span class="text-learning-text-secondary">Overall Progress</span>
+                  <span class="text-learning-text-secondary">Overall Progress / 整體進度</span>
                   <span class="text-learning-text-primary font-medium">{{ progress }}%</span>
                 </div>
                 <div class="h-2 bg-learning-bg-primary rounded-full overflow-hidden">
@@ -206,18 +206,18 @@ onMounted(() => {
               <div class="grid grid-cols-2 gap-4 text-center">
                 <div class="p-3 bg-learning-bg-primary rounded-lg">
                   <p class="text-2xl font-bold text-learning-accent-primary">{{ completedCount }}</p>
-                  <p class="text-xs text-learning-text-muted">Completed</p>
+                  <p class="text-xs text-learning-text-muted">Completed / 已完成</p>
                 </div>
                 <div class="p-3 bg-learning-bg-primary rounded-lg">
                   <p class="text-2xl font-bold text-learning-text-primary">{{ videoCount - completedCount }}</p>
-                  <p class="text-xs text-learning-text-muted">Remaining</p>
+                  <p class="text-xs text-learning-text-muted">Remaining / 剩餘</p>
                 </div>
               </div>
             </div>
 
             <div class="bg-learning-surface rounded-xl border border-learning-bg-tertiary p-5">
               <h3 class="text-lg font-semibold font-display text-learning-text-primary mb-4">
-                Continue Learning
+                Continue Learning / 繼續學習
               </h3>
               <button
                 v-if="course.course_videos && course.course_videos.length > 0 && course.current_video_index < course.course_videos.length"
@@ -227,13 +227,13 @@ onMounted(() => {
                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M8 5v14l11-7z" />
                 </svg>
-                Resume Learning
+                Resume Learning / 繼續學習
               </button>
               <p v-else-if="course.course_videos && course.course_videos.length > 0" class="text-center text-learning-text-secondary text-sm py-4">
-                Course completed! Great job!
+                Course completed! Great job! / 課程完成！做得好！
               </p>
               <p v-else class="text-center text-learning-text-secondary text-sm py-4">
-                No videos to learn yet.
+                No videos to learn yet. / 尚無影片可學習。
               </p>
             </div>
           </div>

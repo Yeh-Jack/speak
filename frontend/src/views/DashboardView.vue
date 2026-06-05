@@ -3,25 +3,42 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
 import { videoService, type VideoResponse } from '@/services/video.service';
+import { statsService } from '@/services/stats.service';
+import { useVideoStore } from '@/stores/video.store';
 import type { Video } from '@/types';
 
 const router = useRouter();
 const { user } = useAuth();
+const videoStore = useVideoStore();
 
 const videos = ref<Video[]>([]);
 const isLoading = ref(false);
 const error = ref<string | null>(null);
 const showAddModal = ref(false);
 const youtubeUrl = ref('');
-const isCreatingVideo = ref(false);
-const createError = ref<string | null>(null);
-const createProgress = ref('');
+const chunkDuration = ref(Number(import.meta.env.VITE_DEFAULT_CHUNK_SIZE) || 30);
+
+const dashboardStats = ref({
+  wordsLearned: 0,
+  hoursLearned: 0,
+  streakDays: 0,
+  sentencesPracticed: 0,
+});
+const statsLoading = ref(true);
+
+const chunkDurationOptions = [
+  { value: 30, label: '30 sec / 30秒', description: 'Quick practice / 快速練習' },
+  { value: 60, label: '1 min / 1分鐘', description: 'Short segments / 短片段' },
+  { value: 180, label: '3 min / 3分鐘', description: 'Medium segments / 中片段' },
+  { value: 300, label: '5 min / 5分鐘', description: 'Standard segments / 標準片段' },
+  { value: 600, label: '10 min / 10分鐘', description: 'Extended segments / 長片段' },
+];
 
 const stats = computed(() => ({
-  wordsLearned: 47,
-  hoursLearned: 2.5,
-  streakDays: 7,
-  sentencesPracticed: 23,
+  wordsLearned: dashboardStats.value.wordsLearned,
+  hoursLearned: dashboardStats.value.hoursLearned,
+  streakDays: dashboardStats.value.streakDays,
+  sentencesPracticed: dashboardStats.value.sentencesPracticed,
 }));
 
 const recentVideos = computed(() =>
@@ -55,39 +72,37 @@ function goToSpeaking() {
 function openAddModal() {
   showAddModal.value = true;
   youtubeUrl.value = '';
-  createError.value = null;
-  createProgress.value = '';
+  videoStore.setCreatingVideo(false);
 }
 
 function closeAddModal() {
   showAddModal.value = false;
   youtubeUrl.value = '';
-  createError.value = null;
-  createProgress.value = '';
+  chunkDuration.value = 300;
 }
 
 async function createVideoFromYouTube() {
   if (!youtubeUrl.value.trim()) {
-    createError.value = 'Please enter a YouTube URL';
+    videoStore.setCreatingVideo(false, '', null, 'Please enter a YouTube URL / 請輸入 YouTube 網址');
     return;
   }
 
-  isCreatingVideo.value = true;
-  createError.value = null;
-  createProgress.value = 'Starting...';
+  const url = youtubeUrl.value;
+  const chunk = chunkDuration.value;
+  closeAddModal();
+  videoStore.setCreatingVideo(true, 'Starting... / 開始中...');
 
   try {
-    createProgress.value = 'Downloading video...';
-    const response: VideoResponse = await videoService.createFromYouTube(youtubeUrl.value);
-    createProgress.value = 'Processing complete!';
+    videoStore.updateCreateProgress('Downloading video... / 下載影片中...');
+    const response: VideoResponse = await videoService.createFromYouTube(url, chunk);
+    videoStore.setCreatingVideo(false, '', response.video.id);
     videos.value.unshift(response.video);
     setTimeout(() => {
-      closeAddModal();
       goToVideo(response.video.id);
-    }, 1000);
+    }, 500);
   } catch (err: any) {
-    createError.value = err.response?.data?.detail || err.message || 'Failed to create video';
-    isCreatingVideo.value = false;
+    const errorMsg = err.response?.data?.detail || err.message || 'Failed to create video / 創建影片失敗';
+    videoStore.setCreatingVideo(false, '', null, errorMsg);
   }
 }
 
@@ -103,27 +118,45 @@ async function fetchVideos() {
   }
 }
 
+async function fetchDashboardStats() {
+  statsLoading.value = true;
+  try {
+    const data = await statsService.getDashboardStats();
+    dashboardStats.value = {
+      wordsLearned: data.words_learned,
+      hoursLearned: data.hours_learned,
+      streakDays: data.streak_days,
+      sentencesPracticed: data.sentences_practiced,
+    };
+  } catch (err: any) {
+    console.error('Failed to fetch dashboard stats:', err);
+  } finally {
+    statsLoading.value = false;
+  }
+}
+
 onMounted(() => {
   fetchVideos();
+  fetchDashboardStats();
 });
 </script>
 
 <template>
   <div class="min-h-screen bg-learning-bg-primary">
-    <header class="bg-learning-bg-secondary border-b border-learning-bg-tertiary">
+    <header class="sticky top-0 z-40 bg-learning-bg-secondary border-b border-learning-bg-tertiary">
       <div class="container mx-auto px-4 py-4 flex items-center justify-between">
         <router-link to="/" class="text-2xl font-bold font-display text-learning-text-primary">
           Speak
         </router-link>
         <nav class="flex items-center gap-6">
           <router-link to="/" class="text-learning-accent-primary transition-colors">
-            Dashboard
+            Dashboard / 首頁
           </router-link>
           <router-link to="/courses" class="text-learning-text-secondary hover:text-learning-text-primary transition-colors">
-            Courses
+            Courses / 課程
           </router-link>
           <router-link to="/speaking" class="text-learning-text-secondary hover:text-learning-text-primary transition-colors">
-            Speaking
+            Speaking / 口說
           </router-link>
         </nav>
         <div class="flex items-center gap-3">
@@ -134,13 +167,15 @@ onMounted(() => {
       </div>
     </header>
 
+    
+
     <main class="container mx-auto px-4 py-8">
       <div class="mb-8 flex items-center justify-between">
         <div>
           <h1 class="text-3xl font-bold font-display text-learning-text-primary mb-2">
-            Welcome back, {{ user?.email?.split('@')[0] }}!
+            Welcome back, {{ user?.email?.split('@')[0] }}! / 歡迎回來！
           </h1>
-          <p class="text-learning-text-secondary">Continue your English learning journey</p>
+          <p class="text-learning-text-secondary">Continue your English learning journey / 繼續您的英語學習之旅</p>
         </div>
         <button
           @click="openAddModal"
@@ -149,7 +184,7 @@ onMounted(() => {
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
           </svg>
-          Add Video
+          Add Video / 添加影片
         </button>
       </div>
 
@@ -161,7 +196,7 @@ onMounted(() => {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
               </svg>
             </div>
-            <span class="text-learning-text-secondary text-sm">Words Learned</span>
+            <span class="text-learning-text-secondary text-sm">Words Learned / 已學詞匯</span>
           </div>
           <p class="text-3xl font-bold text-learning-text-primary">{{ stats.wordsLearned }}</p>
         </div>
@@ -173,7 +208,7 @@ onMounted(() => {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <span class="text-learning-text-secondary text-sm">Hours Learned</span>
+            <span class="text-learning-text-secondary text-sm">Hours Learned / 學習小時</span>
           </div>
           <p class="text-3xl font-bold text-learning-text-primary">{{ stats.hoursLearned }}</p>
         </div>
@@ -185,7 +220,7 @@ onMounted(() => {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
               </svg>
             </div>
-            <span class="text-learning-text-secondary text-sm">Day Streak</span>
+            <span class="text-learning-text-secondary text-sm">Day Streak / 連續天數</span>
           </div>
           <p class="text-3xl font-bold text-learning-text-primary">{{ stats.streakDays }}</p>
         </div>
@@ -197,7 +232,7 @@ onMounted(() => {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
               </svg>
             </div>
-            <span class="text-learning-text-secondary text-sm">Sentences</span>
+            <span class="text-learning-text-secondary text-sm">Sentences / 句子的練習</span>
           </div>
           <p class="text-3xl font-bold text-learning-text-primary">{{ stats.sentencesPracticed }}</p>
         </div>
@@ -206,9 +241,9 @@ onMounted(() => {
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <div class="lg:col-span-2">
           <div class="flex items-center justify-between mb-4">
-            <h2 class="text-xl font-semibold font-display text-learning-text-primary">Continue Learning</h2>
+            <h2 class="text-xl font-semibold font-display text-learning-text-primary">Continue Learning / 繼續學習</h2>
             <button class="text-sm text-learning-accent-secondary hover:text-learning-accent-secondary/80 transition-colors" @click="goToCourses">
-              View All
+              View All / 查看全部
             </button>
           </div>
 
@@ -224,12 +259,12 @@ onMounted(() => {
             <svg class="w-12 h-12 text-learning-text-muted mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
-            <p class="text-learning-text-secondary mb-4">No videos yet. Add a YouTube video to start learning!</p>
+            <p class="text-learning-text-secondary mb-4">No videos yet. Add a YouTube video to start learning! / 還沒有影片。添加 YouTube 影片開始學習！</p>
             <button
               @click="openAddModal"
               class="px-4 py-2 bg-learning-accent-primary hover:bg-learning-accent-primary/90 text-white font-medium rounded-lg transition-colors"
             >
-              Add Your First Video
+              Add Your First Video / 添加您的第一個影片
             </button>
           </div>
 
@@ -270,7 +305,7 @@ onMounted(() => {
         </div>
 
         <div>
-          <h2 class="text-xl font-semibold font-display text-learning-text-primary mb-4">Quick Actions</h2>
+          <h2 class="text-xl font-semibold font-display text-learning-text-primary mb-4">Quick Actions / 快速操作</h2>
 
           <div class="space-y-3">
             <button
@@ -283,8 +318,8 @@ onMounted(() => {
                 </svg>
               </div>
               <div>
-                <p class="font-medium text-learning-text-primary">Add YouTube Video</p>
-                <p class="text-sm text-learning-text-secondary">Start learning from any video</p>
+                <p class="font-medium text-learning-text-primary">Add YouTube Video / 添加 YouTube 影片</p>
+                <p class="text-sm text-learning-text-secondary">Start learning from any video / 從任何影片開始學習</p>
               </div>
             </button>
 
@@ -298,8 +333,8 @@ onMounted(() => {
                 </svg>
               </div>
               <div>
-                <p class="font-medium text-learning-text-primary">Speaking Practice</p>
-                <p class="text-sm text-learning-text-secondary">Shadowing & pronunciation</p>
+                <p class="font-medium text-learning-text-primary">Speaking Practice / 口說練習</p>
+                <p class="text-sm text-learning-text-secondary">Shadowing & pronunciation / 跟讀與發音</p>
               </div>
             </button>
 
@@ -313,8 +348,8 @@ onMounted(() => {
                 </svg>
               </div>
               <div>
-                <p class="font-medium text-learning-text-primary">Browse Courses</p>
-                <p class="text-sm text-learning-text-secondary">Structured learning paths</p>
+                <p class="font-medium text-learning-text-primary">Browse Courses / 瀏覽課程</p>
+                <p class="text-sm text-learning-text-secondary">Structured learning paths / 結構化學習路徑</p>
               </div>
             </button>
           </div>
@@ -324,13 +359,13 @@ onMounted(() => {
               <svg class="w-5 h-5 text-learning-accent-tertiary" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
               </svg>
-              <span class="font-medium text-learning-text-primary">Daily Goal</span>
+              <span class="font-medium text-learning-text-primary">Daily Goal / 每日目標</span>
             </div>
-            <p class="text-sm text-learning-text-secondary mb-3">Practice English for at least 15 minutes today</p>
+            <p class="text-sm text-learning-text-secondary mb-3">Practice English for at least 15 minutes today / 今天至少練習15分鐘英語</p>
             <div class="h-2 bg-learning-bg-primary rounded-full overflow-hidden">
               <div class="h-full bg-gradient-to-r from-learning-accent-primary to-learning-accent-secondary rounded-full" style="width: 65%" />
             </div>
-            <p class="text-xs text-learning-text-muted mt-1">10 min remaining</p>
+            <p class="text-xs text-learning-text-muted mt-1">10 min remaining / 還剩10分鐘</p>
           </div>
         </div>
       </div>
@@ -339,7 +374,7 @@ onMounted(() => {
     <div v-if="showAddModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="closeAddModal">
       <div class="bg-learning-surface rounded-xl border border-learning-bg-tertiary w-full max-w-md p-6">
         <div class="flex items-center justify-between mb-6">
-          <h3 class="text-xl font-semibold font-display text-learning-text-primary">Add YouTube Video</h3>
+          <h3 class="text-xl font-semibold font-display text-learning-text-primary">Add YouTube Video / 添加 YouTube 影片</h3>
           <button @click="closeAddModal" class="text-learning-text-muted hover:text-learning-text-primary">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -349,43 +384,54 @@ onMounted(() => {
 
         <div class="space-y-4">
           <div>
-            <label class="block text-sm font-medium text-learning-text-secondary mb-2">YouTube URL</label>
+            <label class="block text-sm font-medium text-learning-text-secondary mb-2">YouTube URL / YouTube 網址</label>
             <input
               v-model="youtubeUrl"
               type="text"
               placeholder="https://www.youtube.com/watch?v=..."
               class="w-full px-4 py-3 bg-learning-bg-primary border border-learning-bg-tertiary rounded-lg text-learning-text-primary placeholder-learning-text-muted focus:outline-none focus:border-learning-accent-primary"
-              :disabled="isCreatingVideo"
               @keyup.enter="createVideoFromYouTube"
             />
           </div>
 
-          <div v-if="createError" class="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
-            {{ createError }}
-          </div>
-
-          <div v-if="isCreatingVideo" class="p-4 bg-learning-bg-primary rounded-lg">
-            <div class="flex items-center gap-3 mb-2">
-              <div class="animate-spin w-5 h-5 border-2 border-learning-accent-primary border-t-transparent rounded-full"></div>
-              <span class="text-learning-text-primary font-medium">{{ createProgress }}</span>
+          <div>
+            <label class="block text-sm font-medium text-learning-text-secondary mb-2">Chunk Size / 片段大小</label>
+            <div class="grid grid-cols-1 gap-2">
+              <button
+                v-for="option in chunkDurationOptions"
+                :key="option.value"
+                @click="chunkDuration = option.value"
+                class="p-3 rounded-lg border text-left transition-all"
+                :class="chunkDuration === option.value
+                  ? 'border-learning-accent-primary bg-learning-accent-primary/10'
+                  : 'border-learning-bg-tertiary hover:border-learning-accent-primary/50'"
+              >
+                <div class="flex items-center justify-between">
+                  <span class="font-medium text-learning-text-primary">{{ option.label }}</span>
+                  <span v-if="chunkDuration === option.value" class="text-learning-accent-primary">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                    </svg>
+                  </span>
+                </div>
+                <p class="text-xs text-learning-text-muted mt-1">{{ option.description }}</p>
+              </button>
             </div>
-            <p class="text-sm text-learning-text-muted">This may take a few minutes depending on video length...</p>
           </div>
 
           <div class="flex gap-3 pt-2">
             <button
               @click="closeAddModal"
               class="flex-1 px-4 py-2 border border-learning-bg-tertiary text-learning-text-secondary hover:text-learning-text-primary rounded-lg transition-colors"
-              :disabled="isCreatingVideo"
             >
-              Cancel
+              Cancel / 取消
             </button>
             <button
               @click="createVideoFromYouTube"
               class="flex-1 px-4 py-2 bg-learning-accent-primary hover:bg-learning-accent-primary/90 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
-              :disabled="isCreatingVideo || !youtubeUrl.trim()"
+              :disabled="!youtubeUrl.trim()"
             >
-              {{ isCreatingVideo ? 'Processing...' : 'Add Video' }}
+              Add Video / 添加影片
             </button>
           </div>
         </div>

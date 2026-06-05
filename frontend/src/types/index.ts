@@ -12,6 +12,8 @@ export interface Video {
     uploader?: string;
     created_at: string;
     updated_at: string;
+    study_plan_notes?: string | null;
+    study_plan_notes_zh?: string | null;
 }
 
 export interface CourseVideo {
@@ -104,15 +106,23 @@ export interface StudyPlanDisplay {
 
 export interface VocabularyItem {
     word: string;
+    word_zh?: string;
     definition: string;
+    definition_zh?: string;
     context: string;
+    context_zh?: string;
     cefr_level: string;
+    cefr_level_zh?: string;
     pronunciation?: string;
     examples?: string[];
+    examples_zh?: string[];
 }
 
 export interface GrammarItem {
     pattern: string;
+    pattern_zh?: string;
     explanation: string;
+    explanation_zh?: string;
     examples: string[];
+    examples_zh?: string[];
 }

@@ -1,16 +1,22 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { Video, VideoChunk, Transcript, StudyPlan } from '@/types';
+import type { Video, VideoChunk, Transcript } from '@/types';
+import type { StudyPlanResponse } from '@/services/video.service';
 
 export const useVideoStore = defineStore('video', () => {
   const currentVideo = ref<Video | null>(null);
   const chunks = ref<VideoChunk[]>([]);
   const currentChunkIndex = ref(0);
   const transcripts = ref<Record<string, Transcript>>({});
-  const studyPlans = ref<Record<number, StudyPlan>>({});
+  const studyPlans = ref<StudyPlanResponse | null>(null);
   const isLoading = ref(false);
   const error = ref<string | null>(null);
   const savedVocabulary = ref<Set<string>>(new Set());
+
+  const isCreatingVideo = ref(false);
+  const createProgress = ref('');
+  const createdVideoId = ref<string | null>(null);
+  const createError = ref<string | null>(null);
 
   const currentChunk = computed(() => chunks.value[currentChunkIndex.value] || null);
 
@@ -24,7 +30,10 @@ export const useVideoStore = defineStore('video', () => {
     return null;
   });
 
-  const currentStudyPlan = computed(() => studyPlans.value[currentChunkIndex.value] || null);
+  const currentStudyPlan = computed(() => {
+    console.log('currentStudyPlan computed, studyPlans.value:', !!studyPlans.value);
+    return studyPlans.value;
+  });
 
   const currentTranscriptSegments = computed(() => {
     return currentTranscript.value?.segments || [];
@@ -32,6 +41,20 @@ export const useVideoStore = defineStore('video', () => {
 
   const vocabularyItems = computed(() => {
     return currentStudyPlan.value?.vocabulary || [];
+  });
+
+  const grammarItems = computed(() => {
+    return currentStudyPlan.value?.grammar || [];
+  });
+
+  const studyObjectives = computed(() => {
+    return currentStudyPlan.value?.objectives || [];
+  });
+
+  const totalChunks = computed(() => chunks.value.length);
+
+  const completedObjectives = computed(() => {
+    return studyObjectives.value.filter(obj => obj.completed).length;
   });
 
   function setVideo(video: Video) {
@@ -64,8 +87,25 @@ export const useVideoStore = defineStore('video', () => {
     transcripts.value[type] = transcript;
   }
 
-  function setStudyPlan(chunkIndex: number, plan: StudyPlan) {
-    studyPlans.value[chunkIndex] = plan;
+  function setStudyPlan(plan: StudyPlanResponse) {
+    console.log('setStudyPlan called with:', {
+      hasPlan: !!plan,
+      vocabularyCount: plan?.vocabulary?.length || 0,
+      grammarCount: plan?.grammar?.length || 0,
+      planId: plan?.id
+    });
+    studyPlans.value = plan;
+  }
+
+  function toggleObjective(objectiveId: string) {
+    if (!studyPlans.value) return;
+    const objectives = studyPlans.value.objectives.map(obj => {
+      if (obj.id === objectiveId) {
+        return { ...obj, completed: !obj.completed };
+      }
+      return obj;
+    });
+    studyPlans.value = { ...studyPlans.value, objectives };
   }
 
   function toggleVocabularySave(word: string) {
@@ -93,9 +133,20 @@ export const useVideoStore = defineStore('video', () => {
     chunks.value = [];
     currentChunkIndex.value = 0;
     transcripts.value = {};
-    studyPlans.value = {};
+    studyPlans.value = null;
     isLoading.value = false;
     error.value = null;
+  }
+
+  function setCreatingVideo(creating: boolean, progress: string = '', videoId: string | null = null, error: string | null = null) {
+    isCreatingVideo.value = creating;
+    createProgress.value = progress;
+    createdVideoId.value = videoId;
+    createError.value = error;
+  }
+
+  function updateCreateProgress(progress: string) {
+    createProgress.value = progress;
   }
 
   return {
@@ -109,9 +160,17 @@ export const useVideoStore = defineStore('video', () => {
     currentStudyPlan,
     currentTranscriptSegments,
     vocabularyItems,
+    grammarItems,
+    studyObjectives,
+    totalChunks,
+    completedObjectives,
     isLoading,
     error,
     savedVocabulary,
+    isCreatingVideo,
+    createProgress,
+    createdVideoId,
+    createError,
     setVideo,
     setChunks,
     setCurrentChunkIndex,
@@ -119,10 +178,13 @@ export const useVideoStore = defineStore('video', () => {
     previousChunk,
     setTranscript,
     setStudyPlan,
+    toggleObjective,
     toggleVocabularySave,
     isVocabularySaved,
     setLoading,
     setError,
     reset,
+    setCreatingVideo,
+    updateCreateProgress,
   };
 });
