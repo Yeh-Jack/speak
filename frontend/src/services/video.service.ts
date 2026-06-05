@@ -1,11 +1,51 @@
 import api from './api';
-import type { Video, VideoChunk, Transcript, StudyPlan } from '@/types';
+import type { Video, VideoChunk, Transcript } from '@/types';
+
+export interface StudyPlanResponse {
+  id: string;
+  video_id: string;
+  chunk_index: number | null;
+  objectives: Array<{
+    id: string;
+    title: string;
+    description: string;
+    completed: boolean;
+    type: 'vocabulary' | 'grammar' | 'pronunciation' | 'listening' | 'speaking';
+  }>;
+  vocabulary: Array<{
+    word: string;
+    word_zh?: string;
+    definition: string;
+    definition_zh?: string;
+    context: string;
+    context_zh?: string;
+    cefr_level: string;
+    cefr_level_zh?: string;
+    pronunciation?: string;
+    examples?: string[];
+    examples_zh?: string[];
+  }>;
+  grammar: Array<{
+    pattern: string;
+    pattern_zh?: string;
+    explanation: string;
+    explanation_zh?: string;
+    examples: string[];
+    examples_zh?: string[];
+  }>;
+  notes: string | null;
+  notes_zh?: string | null;
+  overall_difficulty: string | null;
+  overall_difficulty_zh?: string | null;
+  estimated_time: string | null;
+  created_at: string | null;
+}
 
 export interface VideoResponse {
   video: Video;
   chunks: VideoChunk[];
-  transcript: Transcript;
-  study_plan: StudyPlan;
+  transcript?: Transcript;
+  study_plan?: StudyPlanResponse;
 }
 
 export interface TranscriptResponse {
@@ -38,8 +78,34 @@ export const videoService = {
     return response.data;
   },
 
-  async getStudyPlan(videoId: string, chunkIndex: number): Promise<StudyPlan> {
-    const response = await api.get<StudyPlan>(`/videos/${videoId}/study-plans/${chunkIndex}`);
+  async getStudyPlans(videoId: string): Promise<StudyPlanResponse[]> {
+    console.log('videoService.getStudyPlans called with:', videoId);
+    try {
+      const response = await api.get<StudyPlanResponse[]>(`/videos/${videoId}/study-plans`);
+      console.log('videoService.getStudyPlans response status:', response.status);
+      console.log('videoService.getStudyPlans response data length:', response.data?.length);
+      return response.data;
+    } catch (err: any) {
+      console.error('videoService.getStudyPlans error:', err.message);
+      console.error('videoService.getStudyPlans error response:', err.response?.data);
+      console.error('videoService.getStudyPlans error status:', err.response?.status);
+      throw err;
+    }
+  },
+
+  async getStudyPlan(videoId: string, chunkIndex: number): Promise<StudyPlanResponse> {
+    const response = await api.get<StudyPlanResponse>(`/videos/${videoId}/study-plans/${chunkIndex}`);
+    return response.data;
+  },
+
+  async updateStudyPlanObjective(
+    videoId: string,
+    chunkIndex: number,
+    objectives: Array<{ id: string; completed: boolean }>
+  ): Promise<StudyPlanResponse> {
+    const response = await api.patch<StudyPlanResponse>(`/videos/${videoId}/study-plans/${chunkIndex}`, {
+      objectives,
+    });
     return response.data;
   },
 
@@ -55,8 +121,11 @@ export const videoService = {
     return response.data;
   },
 
-  async createFromYouTube(youtubeUrl: string): Promise<VideoResponse> {
-    const response = await api.post<VideoResponse>('/videos/youtube', { youtube_url: youtubeUrl });
+  async createFromYouTube(youtubeUrl: string, chunkDuration: number = 300): Promise<VideoResponse> {
+    const response = await api.post<VideoResponse>('/videos/youtube', { 
+      youtube_url: youtubeUrl,
+      chunk_duration: chunkDuration,
+    });
     return response.data;
   },
 

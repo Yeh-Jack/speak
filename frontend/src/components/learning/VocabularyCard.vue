@@ -3,11 +3,16 @@ import { ref, computed } from 'vue';
 
 interface Props {
   word: string;
+  wordZh?: string | null;
   definition?: string | null;
+  definitionZh?: string | null;
   context?: string | null;
+  contextZh?: string | null;
   cefrLevel?: string | null;
+  cefrLevelZh?: string | null;
   pronunciation?: string;
   examples?: string[];
+  examplesZh?: string[];
   isSaved?: boolean;
 }
 
@@ -115,9 +120,12 @@ function saveWord() {
           </div>
 
           <div class="flex-1 flex flex-col justify-center items-center text-center">
-            <h3 class="text-2xl font-bold text-learning-text-primary mb-2 font-display">
+            <h3 class="text-2xl font-bold text-learning-text-primary mb-1 font-display">
               {{ word }}
             </h3>
+            <p v-if="wordZh" class="text-lg text-learning-accent-secondary mb-2">
+              {{ wordZh }}
+            </p>
             <p v-if="pronunciation" class="text-sm text-learning-text-secondary mb-4">
               {{ pronunciation }}
             </p>
@@ -129,12 +137,12 @@ function saveWord() {
               <svg class="w-4 h-4" :class="{ 'animate-bounce-gentle': isPlaying }" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
               </svg>
-              <span class="text-sm font-medium">Listen</span>
+              <span class="text-sm font-medium">Listen / 聽</span>
             </button>
           </div>
 
           <p class="text-sm text-learning-text-muted text-center">
-            Click to flip
+            點擊翻轉 / Click to flip
           </p>
         </div>
       </div>
@@ -146,7 +154,7 @@ function saveWord() {
         <div class="flex flex-col h-full">
           <div class="flex items-center justify-between mb-3">
             <span class="text-xs font-medium text-learning-accent-primary uppercase tracking-wide">
-              Definition
+              Definition / 定義
             </span>
             <span
               v-if="cefrLevel"
@@ -158,22 +166,28 @@ function saveWord() {
           </div>
 
           <div class="flex-1 overflow-auto">
-            <p class="text-learning-text-primary leading-relaxed mb-4">
+            <p class="text-learning-text-primary leading-relaxed mb-2">
               {{ definition || 'No definition available' }}
+            </p>
+            <p v-if="definitionZh" class="text-learning-accent-secondary leading-relaxed mb-4">
+              {{ definitionZh }}
             </p>
 
             <div v-if="context" class="mb-4">
               <p class="text-xs font-medium text-learning-text-secondary uppercase tracking-wide mb-1">
-                Context
+                Context / 情境
               </p>
               <p class="text-sm text-learning-text-muted italic">
                 "{{ context }}"
+              </p>
+              <p v-if="contextZh" class="text-sm text-learning-accent-secondary italic">
+                "{{ contextZh }}"
               </p>
             </div>
 
             <div v-if="examples && examples.length > 0">
               <p class="text-xs font-medium text-learning-text-secondary uppercase tracking-wide mb-2">
-                Examples
+                Examples / 例句
               </p>
               <ul class="space-y-1">
                 <li
@@ -182,6 +196,9 @@ function saveWord() {
                   class="text-sm text-learning-text-muted"
                 >
                   • {{ example }}
+                  <span v-if="examplesZh && examplesZh[index]" class="text-learning-accent-secondary text-xs ml-1">
+                    {{ examplesZh[index] }}
+                  </span>
                 </li>
               </ul>
             </div>
@@ -192,10 +209,10 @@ function saveWord() {
               @click.stop="emit('markReviewed', word)"
               class="text-xs text-learning-accent-tertiary hover:text-learning-accent-tertiary/80 transition-colors"
             >
-              Mark as reviewed
+              Mark as reviewed / 標記為已複習
             </button>
             <p class="text-xs text-learning-text-muted">
-              Click to flip back
+              點擊翻轉 / Click to flip back
             </p>
           </div>
         </div>
