@@ -2,7 +2,6 @@
 
 from app.db.base import Base, TimestampMixin
 from app.models.chunk import VideoChunk
-from app.models.course import Course, CourseVideo
 from app.models.progress import StudyProgress
 from app.models.study_plan import StudyPlan
 from app.models.transcript import Transcript
@@ -16,8 +15,6 @@ __all__ = [
     "VideoChunk",
     "Transcript",
     "StudyPlan",
-    "Course",
-    "CourseVideo",
     "StudyProgress",
     "Vocabulary",
 ]
