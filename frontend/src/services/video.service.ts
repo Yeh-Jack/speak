@@ -150,6 +150,28 @@ export const videoService = {
     const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
     return `${baseUrl}/api/v1/videos/${videoId}/stream`;
   },
+
+  async saveProgress(
+    videoId: string,
+    chunkIndex: number,
+    currentTimestamp: number
+  ): Promise<void> {
+    await api.patch(`/videos/${videoId}/progress`, {
+      chunk_index: chunkIndex,
+      current_timestamp: currentTimestamp,
+    });
+  },
+
+  async getProgress(videoId: string): Promise<{ chunk_index: number; timestamp: number } | null> {
+    try {
+      const response = await api.get<{ video_id: string; chunk_index: number; timestamp: number }>(
+        `/videos/${videoId}/progress`
+      );
+      return { chunk_index: response.data.chunk_index, timestamp: response.data.timestamp };
+    } catch {
+      return null;
+    }
+  },
 };
 
 export default videoService;

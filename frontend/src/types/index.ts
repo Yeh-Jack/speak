@@ -65,6 +65,7 @@ export interface TranscriptSegment {
     start: number;
     end: number;
     text: string;
+    text_zh?: string;
 }
 
 export interface Transcript {

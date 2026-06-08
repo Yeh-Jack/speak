@@ -14,10 +14,12 @@ interface Props {
   examples?: string[];
   examplesZh?: string[];
   isSaved?: boolean;
+  showZh?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   isSaved: false,
+  showZh: true,
 });
 
 const emit = defineEmits<{
@@ -123,7 +125,7 @@ function saveWord() {
             <h3 class="text-2xl font-bold text-learning-text-primary mb-1 font-display">
               {{ word }}
             </h3>
-            <p v-if="wordZh" class="text-lg text-learning-accent-secondary mb-2">
+            <p v-if="showZh && wordZh" class="text-lg text-learning-accent-secondary mb-2">
               {{ wordZh }}
             </p>
             <p v-if="pronunciation" class="text-sm text-learning-text-secondary mb-4">
@@ -169,7 +171,7 @@ function saveWord() {
             <p class="text-learning-text-primary leading-relaxed mb-2">
               {{ definition || 'No definition available' }}
             </p>
-            <p v-if="definitionZh" class="text-learning-accent-secondary leading-relaxed mb-4">
+            <p v-if="showZh && definitionZh" class="text-learning-accent-secondary leading-relaxed mb-4">
               {{ definitionZh }}
             </p>
 
@@ -180,7 +182,7 @@ function saveWord() {
               <p class="text-sm text-learning-text-muted italic">
                 "{{ context }}"
               </p>
-              <p v-if="contextZh" class="text-sm text-learning-accent-secondary italic">
+              <p v-if="showZh && contextZh" class="text-sm text-learning-accent-secondary italic">
                 "{{ contextZh }}"
               </p>
             </div>
@@ -196,7 +198,7 @@ function saveWord() {
                   class="text-sm text-learning-text-muted"
                 >
                   • {{ example }}
-                  <span v-if="examplesZh && examplesZh[index]" class="text-learning-accent-secondary text-xs ml-1">
+                  <span v-if="showZh && examplesZh && examplesZh[index]" class="text-learning-accent-secondary text-xs ml-1">
                     {{ examplesZh[index] }}
                   </span>
                 </li>

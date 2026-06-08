@@ -10,10 +10,12 @@ from app.api.deps import get_db
 from app.core.config import DATA_DIR
 from app.repositories import (
     ChunkRepository,
+    ProgressRepository,
     StudyPlanRepository,
     TranscriptRepository,
     VideoRepository,
 )
+from app.models.progress import StudyProgress
 from app.schemas.video import (
     Video,
     VideoChunk,
@@ -24,6 +26,7 @@ from app.schemas.video import (
     ProcessingTimings,
 )
 from app.schemas.transcript import TranscriptUpload
+from app.schemas.progress import StudyProgressUpdate, ResumeInfo
 from app.services.video_service import VideoService
 from app.services.download_service import DownloadService
 
@@ -32,13 +35,19 @@ router = APIRouter()
 
 def _transform_vocabulary_item(item: dict) -> dict:
     """Transform vocabulary item from database format to frontend format."""
+    example = item.get("example", "")
     return {
         "word": item.get("word", ""),
+        "word_zh": item.get("word_zh", ""),
         "definition": item.get("definition", ""),
-        "context": item.get("example", ""),
-        "cefr_level": item.get("difficulty", "").upper() if item.get("difficulty") else "",
+        "definition_zh": item.get("definition_zh", ""),
+        "context": item.get("context", "") or example,
+        "context_zh": item.get("context_zh", ""),
+        "cefr_level": item.get("cefr_level", item.get("difficulty", "")).upper(),
+        "cefr_level_zh": item.get("cefr_level_zh", ""),
         "pronunciation": item.get("pronunciation", ""),
-        "examples": [item.get("example", "")] if item.get("example") else [],
+        "examples": [example] if example else [],
+        "examples_zh": [item.get("example_zh", "")] if item.get("example_zh") else [],
     }
 
 
@@ -46,8 +55,11 @@ def _transform_grammar_item(item: dict) -> dict:
     """Transform grammar item from database format to frontend format."""
     return {
         "pattern": item.get("pattern", ""),
+        "pattern_zh": item.get("pattern_zh", ""),
         "explanation": item.get("explanation", ""),
+        "explanation_zh": item.get("explanation_zh", ""),
         "examples": item.get("examples", []) or [],
+        "examples_zh": item.get("examples_zh", []) or [],
     }
 
 
@@ -557,3 +569,94 @@ async def update_study_plan_objective(
         "estimated_time": study_plan.estimated_time,
         "updated": True,
     }
+
+
+@router.patch("/{video_id}/progress", response_model=ResumeInfo)
+async def update_progress(
+    video_id: UUID,
+    progress_data: StudyProgressUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    """Update video playback progress (chunk index and timestamp)."""
+    video_repo = VideoRepository(db)
+    progress_repo = ProgressRepository(db)
+
+    video = await video_repo.get_by_id(video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    video_id_str = str(video_id)
+
+    chunk_index = progress_data.chunk_index if progress_data.chunk_index is not None else 0
+    current_timestamp = (
+        progress_data.current_timestamp if progress_data.current_timestamp is not None else 0.0
+    )
+
+    progress = await progress_repo.get_by_video_and_chunk(video_id, chunk_index)
+
+    if progress:
+        if progress_data.current_timestamp is not None:
+            progress.current_timestamp = current_timestamp
+        if progress_data.completed is not None:
+            progress.completed = progress_data.completed
+    else:
+        progress = StudyProgress(
+            video_id=video_id_str,
+            chunk_index=chunk_index,
+            current_timestamp=current_timestamp,
+            completed=progress_data.completed or False,
+        )
+
+    await progress_repo.save(progress)
+
+    return ResumeInfo(
+        video_id=video_id,
+        chunk_index=chunk_index,
+        timestamp=current_timestamp,
+        sentence_index=None,
+    )
+
+
+@router.get("/{video_id}/progress", response_model=ResumeInfo | None)
+async def get_progress(
+    video_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get video playback progress for resuming."""
+    progress_repo = ProgressRepository(db)
+
+    video_repo = VideoRepository(db)
+    video = await video_repo.get_by_id(video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    chunk_repo = ChunkRepository(db)
+    chunks = await chunk_repo.get_by_video_id(video_id)
+
+    if not chunks:
+        return ResumeInfo(
+            video_id=video_id,
+            chunk_index=0,
+            timestamp=0.0,
+            sentence_index=None,
+        )
+
+    progress_list = await progress_repo.get_by_video_id(video_id)
+    if not progress_list:
+        return ResumeInfo(
+            video_id=video_id,
+            chunk_index=0,
+            timestamp=0.0,
+            sentence_index=None,
+        )
+
+    latest_progress = progress_list[-1]
+
+    resume_timestamp = max(0.0, latest_progress.current_timestamp - 3.0)
+
+    return ResumeInfo(
+        video_id=video_id,
+        chunk_index=latest_progress.chunk_index,
+        timestamp=resume_timestamp,
+        sentence_index=None,
+    )

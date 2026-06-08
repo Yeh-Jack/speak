@@ -65,7 +65,7 @@ onMounted(() => {
 
 <template>
   <div class="min-h-screen bg-learning-bg-primary">
-    <header class="bg-learning-bg-secondary border-b border-learning-bg-tertiary">
+    <header class="sticky top-0 z-40 bg-learning-bg-secondary border-b border-learning-bg-tertiary">
       <div class="container mx-auto px-4 py-4 flex items-center justify-between">
         <div class="flex items-center gap-4">
           <router-link to="/" class="text-2xl font-bold font-display text-learning-text-primary">
