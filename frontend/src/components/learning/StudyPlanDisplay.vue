@@ -46,10 +46,12 @@ interface Props {
   plan: StudyPlan;
   currentChunkIndex: number;
   isLoading?: boolean;
+  showZh?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   isLoading: false,
+  showZh: true,
 });
 
 const emit = defineEmits<{
@@ -59,7 +61,6 @@ const emit = defineEmits<{
 }>();
 
 const activeTab = ref<'overview' | 'vocabulary' | 'grammar' | 'pronunciation'>('vocabulary');
-const showZh = ref(true);
 
 const progress = computed(() => {
   if (props.plan.totalChunks === 0) return 0;
@@ -113,18 +114,9 @@ const cefrLevelColor = (level: string | undefined) => {
         <h2 class="text-lg font-semibold font-display text-learning-text-primary">
           Study Plan / 學習計劃
         </h2>
-        <div class="flex items-center gap-2">
-          <button
-            @click="showZh = !showZh"
-            class="px-2 py-1 text-xs rounded border transition-colors"
-            :class="showZh ? 'bg-learning-accent-primary text-white border-learning-accent-primary' : 'bg-learning-bg-primary text-learning-text-secondary border-learning-bg-tertiary hover:border-learning-accent-primary'"
-          >
-            中文
-          </button>
-          <span class="text-sm text-learning-text-secondary">
-            Chunk {{ currentChunkIndex + 1 }} / {{ plan.totalChunks }}
-          </span>
-        </div>
+        <span class="text-sm text-learning-text-secondary">
+          Chunk {{ currentChunkIndex + 1 }} / {{ plan.totalChunks }}
+        </span>
       </div>
 
       <div class="mb-4">

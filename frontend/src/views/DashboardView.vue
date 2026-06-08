@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
 import { videoService, type VideoResponse } from '@/services/video.service';
@@ -17,6 +17,7 @@ const error = ref<string | null>(null);
 const showAddModal = ref(false);
 const youtubeUrl = ref('');
 const chunkDuration = ref(Number(import.meta.env.VITE_DEFAULT_CHUNK_SIZE) || 30);
+const youtubeUrlInput = ref<HTMLInputElement | null>(null);
 
 const dashboardStats = ref({
   wordsLearned: 0,
@@ -73,6 +74,9 @@ function openAddModal() {
   showAddModal.value = true;
   youtubeUrl.value = '';
   videoStore.setCreatingVideo(false);
+  nextTick(() => {
+    youtubeUrlInput.value?.focus();
+  });
 }
 
 function closeAddModal() {
@@ -188,7 +192,7 @@ onMounted(() => {
         </button>
       </div>
 
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
         <div class="bg-learning-surface rounded-xl p-5 border border-learning-bg-tertiary">
           <div class="flex items-center gap-3 mb-3">
             <div class="w-10 h-10 rounded-lg bg-learning-accent-secondary/10 flex items-center justify-center">
@@ -236,136 +240,84 @@ onMounted(() => {
           </div>
           <p class="text-3xl font-bold text-learning-text-primary">{{ stats.sentencesPracticed }}</p>
         </div>
-      </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        <div class="lg:col-span-2">
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-xl font-semibold font-display text-learning-text-primary">Continue Learning / 繼續學習</h2>
-            <button class="text-sm text-learning-accent-secondary hover:text-learning-accent-secondary/80 transition-colors" @click="goToCourses">
-              View All / 查看全部
-            </button>
-          </div>
-
-          <div v-if="isLoading" class="flex items-center justify-center py-12">
-            <div class="animate-spin w-8 h-8 border-4 border-learning-accent-primary border-t-transparent rounded-full"></div>
-          </div>
-
-          <div v-else-if="error" class="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-red-400">
-            {{ error }}
-          </div>
-
-          <div v-else-if="videos.length === 0" class="bg-learning-surface rounded-xl border border-learning-bg-tertiary p-8 text-center">
-            <svg class="w-12 h-12 text-learning-text-muted mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-            <p class="text-learning-text-secondary mb-4">No videos yet. Add a YouTube video to start learning! / 還沒有影片。添加 YouTube 影片開始學習！</p>
-            <button
-              @click="openAddModal"
-              class="px-4 py-2 bg-learning-accent-primary hover:bg-learning-accent-primary/90 text-white font-medium rounded-lg transition-colors"
-            >
-              Add Your First Video / 添加您的第一個影片
-            </button>
-          </div>
-
-          <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div
-              v-for="video in recentVideos"
-              :key="video.id"
-              @click="goToVideo(video.id)"
-              class="bg-learning-surface rounded-xl overflow-hidden border border-learning-bg-tertiary cursor-pointer card-interactive group"
-            >
-              <div class="relative aspect-video bg-learning-bg-primary">
-                <img :src="video.thumbnail" :alt="video.title" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
-                <div class="absolute inset-0 flex items-center justify-center">
-                  <div class="w-12 h-12 rounded-full bg-learning-accent-primary/90 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <svg class="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                  </div>
-                </div>
-                <span class="absolute bottom-2 right-2 px-2 py-0.5 bg-black/70 rounded text-xs text-white font-mono">
-                  {{ video.duration }}
-                </span>
-              </div>
-              <div class="p-4">
-                <h3 class="font-medium text-learning-text-primary mb-2">{{ video.title }}</h3>
-                <div class="flex items-center gap-2">
-                  <div class="flex-1 h-1.5 bg-learning-bg-primary rounded-full overflow-hidden">
-                    <div
-                      class="h-full bg-learning-accent-primary rounded-full"
-                      :style="{ width: `${video.progress}%` }"
-                    />
-                  </div>
-                  <span class="text-xs text-learning-text-secondary">{{ video.progress }}%</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <h2 class="text-xl font-semibold font-display text-learning-text-primary mb-4">Quick Actions / 快速操作</h2>
-
-          <div class="space-y-3">
-            <button
-              @click="openAddModal"
-              class="w-full flex items-center gap-4 p-4 bg-learning-surface rounded-xl border border-learning-bg-tertiary hover:border-learning-accent-primary/50 transition-colors text-left group"
-            >
-              <div class="w-12 h-12 rounded-xl bg-learning-accent-primary/10 flex items-center justify-center group-hover:bg-learning-accent-primary/20 transition-colors">
-                <svg class="w-6 h-6 text-learning-accent-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                </svg>
-              </div>
-              <div>
-                <p class="font-medium text-learning-text-primary">Add YouTube Video / 添加 YouTube 影片</p>
-                <p class="text-sm text-learning-text-secondary">Start learning from any video / 從任何影片開始學習</p>
-              </div>
-            </button>
-
-            <button
-              @click="goToSpeaking"
-              class="w-full flex items-center gap-4 p-4 bg-learning-surface rounded-xl border border-learning-bg-tertiary hover:border-learning-accent-secondary/50 transition-colors text-left group"
-            >
-              <div class="w-12 h-12 rounded-xl bg-learning-accent-secondary/10 flex items-center justify-center group-hover:bg-learning-accent-secondary/20 transition-colors">
-                <svg class="w-6 h-6 text-learning-accent-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                </svg>
-              </div>
-              <div>
-                <p class="font-medium text-learning-text-primary">Speaking Practice / 口說練習</p>
-                <p class="text-sm text-learning-text-secondary">Shadowing & pronunciation / 跟讀與發音</p>
-              </div>
-            </button>
-
-            <button
-              @click="goToCourses"
-              class="w-full flex items-center gap-4 p-4 bg-learning-surface rounded-xl border border-learning-bg-tertiary hover:border-purple-500/50 transition-colors text-left group"
-            >
-              <div class="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
-                <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
-              </div>
-              <div>
-                <p class="font-medium text-learning-text-primary">Browse Courses / 瀏覽課程</p>
-                <p class="text-sm text-learning-text-secondary">Structured learning paths / 結構化學習路徑</p>
-              </div>
-            </button>
-          </div>
-
-          <div class="mt-6 p-4 bg-gradient-to-br from-learning-accent-primary/10 to-learning-accent-secondary/10 rounded-xl border border-learning-accent-primary/20">
-            <div class="flex items-center gap-2 mb-2">
-              <svg class="w-5 h-5 text-learning-accent-tertiary" fill="currentColor" viewBox="0 0 24 24">
+        <div class="bg-gradient-to-br from-learning-accent-primary/10 to-learning-accent-secondary/10 rounded-xl p-5 border border-learning-accent-primary/20">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-10 h-10 rounded-lg bg-learning-accent-primary/10 flex items-center justify-center">
+              <svg class="w-5 h-5 text-learning-accent-primary" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
               </svg>
-              <span class="font-medium text-learning-text-primary">Daily Goal / 每日目標</span>
             </div>
-            <p class="text-sm text-learning-text-secondary mb-3">Practice English for at least 15 minutes today / 今天至少練習15分鐘英語</p>
-            <div class="h-2 bg-learning-bg-primary rounded-full overflow-hidden">
-              <div class="h-full bg-gradient-to-r from-learning-accent-primary to-learning-accent-secondary rounded-full" style="width: 65%" />
+            <span class="text-learning-text-primary text-sm font-medium">Daily Goal / 每日目標</span>
+          </div>
+          <div class="h-2 bg-learning-bg-primary rounded-full overflow-hidden mb-2">
+            <div class="h-full bg-gradient-to-r from-learning-accent-primary to-learning-accent-secondary rounded-full" style="width: 65%" />
+          </div>
+          <p class="text-xs text-learning-text-muted">10 min remaining / 還剩10分鐘</p>
+        </div>
+      </div>
+
+      <div class="mb-8">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-semibold font-display text-learning-text-primary">Continue Learning / 繼續學習</h2>
+          <button class="text-sm text-learning-accent-secondary hover:text-learning-accent-secondary/80 transition-colors" @click="goToCourses">
+            View All / 查看全部
+          </button>
+        </div>
+
+        <div v-if="isLoading" class="flex items-center justify-center py-12">
+          <div class="animate-spin w-8 h-8 border-4 border-learning-accent-primary border-t-transparent rounded-full"></div>
+        </div>
+
+        <div v-else-if="error" class="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-red-400">
+          {{ error }}
+        </div>
+
+        <div v-else-if="videos.length === 0" class="bg-learning-surface rounded-xl border border-learning-bg-tertiary p-8 text-center">
+          <svg class="w-12 h-12 text-learning-text-muted mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+          <p class="text-learning-text-secondary mb-4">No videos yet. Add a YouTube video to start learning! / 還沒有影片。添加 YouTube 影片開始學習！</p>
+          <button
+            @click="openAddModal"
+            class="px-4 py-2 bg-learning-accent-primary hover:bg-learning-accent-primary/90 text-white font-medium rounded-lg transition-colors"
+          >
+            Add Your First Video / 添加您的第一個影片
+          </button>
+        </div>
+
+        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div
+            v-for="video in recentVideos"
+            :key="video.id"
+            @click="goToVideo(video.id)"
+            class="bg-learning-surface rounded-xl overflow-hidden border border-learning-bg-tertiary cursor-pointer card-interactive group"
+          >
+            <div class="relative aspect-video bg-learning-bg-primary">
+              <img :src="video.thumbnail" :alt="video.title" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+              <div class="absolute inset-0 flex items-center justify-center">
+                <div class="w-12 h-12 rounded-full bg-learning-accent-primary/90 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <svg class="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </div>
+              </div>
+              <span class="absolute bottom-2 right-2 px-2 py-0.5 bg-black/70 rounded text-xs text-white font-mono">
+                {{ video.duration }}
+              </span>
             </div>
-            <p class="text-xs text-learning-text-muted mt-1">10 min remaining / 還剩10分鐘</p>
+            <div class="p-4">
+              <h3 class="font-medium text-learning-text-primary mb-2">{{ video.title }}</h3>
+              <div class="flex items-center gap-2">
+                <div class="flex-1 h-1.5 bg-learning-bg-primary rounded-full overflow-hidden">
+                  <div
+                    class="h-full bg-learning-accent-primary rounded-full"
+                    :style="{ width: `${video.progress}%` }"
+                  />
+                </div>
+                <span class="text-xs text-learning-text-secondary">{{ video.progress }}%</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -386,6 +338,7 @@ onMounted(() => {
           <div>
             <label class="block text-sm font-medium text-learning-text-secondary mb-2">YouTube URL / YouTube 網址</label>
             <input
+              ref="youtubeUrlInput"
               v-model="youtubeUrl"
               type="text"
               placeholder="https://www.youtube.com/watch?v=..."

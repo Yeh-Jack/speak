@@ -5,6 +5,7 @@ export interface TranscriptSegment {
   start: number;
   end: number;
   text: string;
+  text_zh?: string;
 }
 
 interface Props {
@@ -12,16 +13,20 @@ interface Props {
   poster?: string;
   transcript?: TranscriptSegment[];
   autoPlay?: boolean;
+  showZh?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   autoPlay: false,
+  showZh: false,
 });
 
 const emit = defineEmits<{
   timeUpdate: [time: number];
   ended: [];
+  paused: [];
   ready: [];
+  playPause: [isPlaying: boolean];
 }>();
 
 const videoRef = ref<HTMLVideoElement | null>(null);
@@ -91,6 +96,17 @@ function handlePlay() {
 
 function handlePause() {
   isPlaying.value = false;
+  emit('paused');
+}
+
+function togglePlayPause() {
+  if (!videoRef.value) return;
+  if (isPlaying.value) {
+    videoRef.value.pause();
+  } else {
+    videoRef.value.play();
+  }
+  emit('playPause', !isPlaying.value);
 }
 
 function handleEnded() {
@@ -206,10 +222,11 @@ defineExpose({
 <template>
   <div
     ref="containerRef"
-    class="relative group bg-black rounded-lg overflow-hidden"
+    class="relative group bg-black rounded-lg overflow-hidden cursor-pointer"
     :class="{ 'cursor-hidden': !showControls && isPlaying }"
     @mousemove="handleMouseMove"
     @mouseleave="showControls = false"
+    @click="togglePlayPause"
   >
     <video
       ref="videoRef"
@@ -226,12 +243,18 @@ defineExpose({
 
     <div
       v-if="showSubtitles && currentSubtitle"
-      class="absolute bottom-20 left-0 right-0 flex justify-center pointer-events-none px-4"
+      class="absolute bottom-20 left-0 right-0 flex flex-col items-center justify-center pointer-events-none px-4 gap-1"
     >
       <div
         class="bg-black/80 backdrop-blur-sm text-white text-xl md:text-2xl font-medium px-6 py-3 rounded-lg max-w-4xl text-center animate-fade-in border border-white/10"
       >
         {{ currentSubtitle.text }}
+      </div>
+      <div
+        v-if="props.showZh && currentSubtitle.text_zh"
+        class="bg-black/60 backdrop-blur-sm text-learning-accent-secondary text-sm md:text-base font-medium px-4 py-1 rounded-lg max-w-4xl text-center animate-fade-in"
+      >
+        {{ currentSubtitle.text_zh }}
       </div>
     </div>
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
 import { useVideoStore } from '@/stores';
 import { videoService } from '@/services/video.service';
@@ -17,12 +17,44 @@ const videoId = computed(() => route.params.id as string);
 const showShadowingMode = ref(false);
 const showVocabularyReview = ref(false);
 const showGrammarNotes = ref(false);
+const showZh = ref(true);
 const videoRef = ref<InstanceType<typeof VideoPlayer> | null>(null);
 const currentTime = ref(0);
 const isLoading = ref(false);
 const error = ref<string | null>(null);
 const videoSrc = ref('');
 const videoStatus = ref<'idle' | 'loading' | 'ready' | 'error'>('idle');
+
+function toggleZh() {
+  showZh.value = !showZh.value;
+}
+
+watch(() => videoStore.currentChunkIndex, (newIndex) => {
+  const chunk = videoStore.chunks[newIndex];
+  if (chunk && videoRef.value) {
+    videoRef.value.seek(chunk.start_time);
+  }
+  saveProgress();
+});
+
+let saveProgressInterval: ReturnType<typeof setInterval> | null = null;
+
+onMounted(() => {
+  videoStore.reset();
+  fetchVideoData();
+  saveProgressInterval = setInterval(() => {
+    if (videoRef.value && videoStore.currentVideo) {
+      saveProgress();
+    }
+  }, 30000);
+});
+
+onUnmounted(() => {
+  saveProgress();
+  if (saveProgressInterval) {
+    clearInterval(saveProgressInterval);
+  }
+});
 
 const currentTranscriptSegments = computed((): TranscriptSegment[] => {
   return videoStore.currentTranscript?.segments || [];
@@ -71,6 +103,17 @@ const studyPlanProps = computed(() => {
 
 function handleTimeUpdate(time: number) {
   currentTime.value = time;
+  const chunkIndex = videoStore.chunks.findIndex((chunk, index) => {
+    const nextChunk = videoStore.chunks[index + 1];
+    const isLastChunk = index === videoStore.chunks.length - 1;
+    if (isLastChunk) {
+      return time >= chunk.start_time;
+    }
+    return time >= chunk.start_time && time < (nextChunk?.start_time ?? Infinity);
+  });
+  if (chunkIndex !== -1 && chunkIndex !== videoStore.currentChunkIndex) {
+    videoStore.setCurrentChunkIndex(chunkIndex);
+  }
 }
 
 function handleVocabularyPlay(word: string) {
@@ -163,12 +206,32 @@ async function fetchVideoData() {
     }
 
     videoSrc.value = await videoService.getStreamUrl(videoId.value);
+
+    const resumeInfo = await videoService.getProgress(videoId.value);
+    if (resumeInfo && resumeInfo.timestamp > 0) {
+      videoStore.setCurrentChunkIndex(resumeInfo.chunk_index);
+      await nextTick();
+      if (videoRef.value) {
+        videoRef.value.seek(resumeInfo.timestamp);
+      }
+    }
+
     videoStatus.value = 'ready';
   } catch (err: any) {
     error.value = err.response?.data?.detail || err.message || 'Failed to load video';
     videoStatus.value = 'error';
   } finally {
     isLoading.value = false;
+  }
+}
+
+async function saveProgress() {
+  if (!videoRef.value || !videoStore.currentVideo) return;
+  try {
+    const currentTime = videoRef.value.getCurrentTime();
+    await videoService.saveProgress(videoId.value, videoStore.currentChunkIndex, currentTime);
+  } catch (err) {
+    console.error('Failed to save progress:', err);
   }
 }
 
@@ -180,7 +243,7 @@ onMounted(() => {
 
 <template>
   <div class="min-h-screen bg-learning-bg-primary">
-    <header class="bg-learning-bg-secondary border-b border-learning-bg-tertiary">
+    <header class="sticky top-0 z-40 bg-learning-bg-secondary border-b border-learning-bg-tertiary">
       <div class="container mx-auto px-4 py-4 flex items-center justify-between">
         <div class="flex items-center gap-4">
           <router-link to="/" class="text-xl font-bold font-display text-learning-text-primary">
@@ -189,12 +252,23 @@ onMounted(() => {
           <span class="text-learning-text-muted">/</span>
           <span class="text-learning-text-secondary">Learning / 學習</span>
         </div>
-        <router-link
-          to="/courses"
-          class="text-sm text-learning-text-secondary hover:text-learning-text-primary transition-colors"
-        >
-          Back to Courses / 返回課程
-        </router-link>
+        <div class="flex items-center gap-4">
+          <button
+            @click="toggleZh"
+            class="px-3 py-1.5 text-sm rounded border transition-colors"
+            :class="showZh
+              ? 'bg-learning-accent-primary text-white border-learning-accent-primary'
+              : 'bg-learning-bg-primary text-learning-text-secondary border-learning-bg-tertiary hover:border-learning-accent-primary'"
+          >
+            中文
+          </button>
+          <router-link
+            to="/"
+            class="text-sm text-learning-text-secondary hover:text-learning-text-primary transition-colors"
+          >
+            Back to Dashboard / 返回主頁
+          </router-link>
+        </div>
       </div>
     </header>
 
@@ -225,7 +299,9 @@ onMounted(() => {
                 ref="videoRef"
                 :src="videoSrc"
                 :transcript="currentTranscriptSegments"
+                :show-zh="showZh"
                 @time-update="handleTimeUpdate"
+                @paused="saveProgress"
               />
               <div v-else class="aspect-video flex items-center justify-center bg-learning-bg-primary">
                 <div class="text-center">
@@ -252,12 +328,13 @@ onMounted(() => {
                   v-for="(chunk, index) in videoStore.chunks"
                   :key="chunk.id"
                   @click="videoStore.setCurrentChunkIndex(index)"
-                  class="px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                  class="px-3 py-2 rounded-lg text-sm font-medium transition-all text-center leading-tight min-w-[3.5rem]"
                   :class="videoStore.currentChunkIndex === index
                     ? 'bg-learning-accent-primary text-white'
                     : 'bg-learning-bg-primary text-learning-text-secondary hover:bg-learning-bg-secondary'"
                 >
-                  Chunk {{ index + 1 }}
+                  <span class="block">{{ index + 1 }}</span>
+                  <span class="block text-xs opacity-70 font-mono">{{ Math.floor(chunk.start_time / 60).toString().padStart(2, '0') }}:{{ Math.floor(chunk.start_time % 60).toString().padStart(2, '0') }}</span>
                 </button>
               </div>
             </div>
@@ -281,6 +358,7 @@ onMounted(() => {
                   :examples="vocab.examples"
                   :examples-zh="vocab.examples_zh"
                   :is-saved="videoStore.isVocabularySaved(vocab.word)"
+                  :show-zh="showZh"
                   @play-audio="handleVocabularyPlay"
                   @save-word="handleVocabularySave"
                 />
@@ -302,6 +380,7 @@ onMounted(() => {
               v-if="studyPlanProps"
               :plan="studyPlanProps.plan"
               :current-chunk-index="studyPlanProps.currentChunkIndex"
+              :show-zh="showZh"
               @start-learning="handleStartLearning"
               @toggle-objective="handleToggleObjective"
               @select-objective="handleSelectObjective"

@@ -25,6 +25,7 @@ class StudyProgressCreate(StudyProgressBase):
 class StudyProgressUpdate(BaseModel):
     """Schema for updating study progress."""
 
+    chunk_index: int | None = None
     current_timestamp: float | None = None
     sentence_index: int | None = None
     completed: bool | None = None
