@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { useI18n } from '@/composables/useI18n';
+
+const { t } = useI18n();
 
 interface Props {
   word: string;
@@ -78,7 +81,7 @@ function saveWord() {
 
 <template>
   <div
-    class="relative h-64 cursor-pointer perspective-1000"
+    class="relative h-[21rem] cursor-pointer perspective-1000"
     @click="flipCard"
   >
     <div
@@ -139,13 +142,11 @@ function saveWord() {
               <svg class="w-4 h-4" :class="{ 'animate-bounce-gentle': isPlaying }" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
               </svg>
-              <span class="text-sm font-medium">Listen / 聽</span>
+              <span class="text-sm font-medium">{{ t('Listen', '聽') }}</span>
             </button>
           </div>
 
-          <p class="text-sm text-learning-text-muted text-center">
-            點擊翻轉 / Click to flip
-          </p>
+          <p class="text-sm text-learning-text-muted text-center">{{ t('Click to flip', '點擊翻轉') }}</p>
         </div>
       </div>
 
@@ -156,7 +157,7 @@ function saveWord() {
         <div class="flex flex-col h-full">
           <div class="flex items-center justify-between mb-3">
             <span class="text-xs font-medium text-learning-accent-primary uppercase tracking-wide">
-              Definition / 定義
+              {{ t('Definition', '定義') }}
             </span>
             <span
               v-if="cefrLevel"
@@ -177,7 +178,7 @@ function saveWord() {
 
             <div v-if="context" class="mb-4">
               <p class="text-xs font-medium text-learning-text-secondary uppercase tracking-wide mb-1">
-                Context / 情境
+                {{ t('Context', '情境') }}
               </p>
               <p class="text-sm text-learning-text-muted italic">
                 "{{ context }}"
@@ -189,7 +190,7 @@ function saveWord() {
 
             <div v-if="examples && examples.length > 0">
               <p class="text-xs font-medium text-learning-text-secondary uppercase tracking-wide mb-2">
-                Examples / 例句
+                {{ t('Examples', '例句') }}
               </p>
               <ul class="space-y-1">
                 <li
@@ -211,10 +212,10 @@ function saveWord() {
               @click.stop="emit('markReviewed', word)"
               class="text-xs text-learning-accent-tertiary hover:text-learning-accent-tertiary/80 transition-colors"
             >
-              Mark as reviewed / 標記為已複習
+              {{ t('Mark as reviewed', '標記為已複習') }}
             </button>
             <p class="text-xs text-learning-text-muted">
-              點擊翻轉 / Click to flip back
+              {{ t('Click to flip back', '點擊翻轉回來') }}
             </p>
           </div>
         </div>
