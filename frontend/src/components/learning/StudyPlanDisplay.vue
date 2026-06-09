@@ -199,13 +199,13 @@ const cefrLevelColor = (level: string | undefined) => {
               {{ vocab.cefr_level }}
             </span>
             <span class="font-medium text-learning-text-primary">{{ vocab.word }}</span>
-            <span v-if="showZh && vocab.word_zh" class="text-sm text-learning-accent-secondary">{{ vocab.word_zh }}</span>
+            <span v-if="showZh && vocab.word_zh" class="text-sm text-learning-chinese">{{ vocab.word_zh }}</span>
             <span v-if="vocab.pronunciation" class="text-sm text-learning-text-muted">{{ vocab.pronunciation }}</span>
           </div>
           <p class="text-sm text-learning-text-secondary mb-1">{{ vocab.definition }}</p>
-          <p v-if="showZh && vocab.definition_zh" class="text-sm text-learning-text-muted mb-2">{{ vocab.definition_zh }}</p>
+          <p v-if="showZh && vocab.definition_zh" class="text-sm text-learning-chinese mb-2">{{ vocab.definition_zh }}</p>
           <p v-if="vocab.context" class="text-sm text-learning-text-muted italic mb-2">"{{ vocab.context }}"</p>
-          <p v-if="showZh && vocab.context_zh" class="text-sm text-learning-accent-secondary/70 italic mb-2">"{{ vocab.context_zh }}"</p>
+          <p v-if="showZh && vocab.context_zh" class="text-sm text-learning-chinese-muted italic mb-2">"{{ vocab.context_zh }}"</p>
           <div v-if="vocab.examples && vocab.examples.length > 0">
             <p class="text-xs font-medium text-learning-text-muted uppercase tracking-wide mb-1">{{ t('Examples', '例句') }}:</p>
             <ul class="space-y-1">
@@ -215,7 +215,7 @@ const cefrLevelColor = (level: string | undefined) => {
                 class="text-sm text-learning-text-secondary pl-2 border-l-2 border-learning-accent-secondary/30"
               >
                 {{ example }}
-                <span v-if="showZh && vocab.examples_zh && vocab.examples_zh[exIndex]" class="text-learning-accent-secondary/70 text-xs ml-1">
+                <span v-if="showZh && vocab.examples_zh && vocab.examples_zh[exIndex]" class="text-learning-chinese-muted text-xs ml-1">
                   {{ vocab.examples_zh[exIndex] }}
                 </span>
               </li>
@@ -238,10 +238,10 @@ const cefrLevelColor = (level: string | undefined) => {
               Pattern {{ index + 1 }}
             </span>
             <code class="text-sm bg-learning-bg-secondary px-2 py-0.5 rounded text-learning-text-primary">{{ grammar.pattern }}</code>
-            <span v-if="showZh && grammar.pattern_zh" class="text-sm text-purple-400">{{ grammar.pattern_zh }}</span>
+            <span v-if="showZh && grammar.pattern_zh" class="text-sm text-learning-chinese">{{ grammar.pattern_zh }}</span>
           </div>
           <p class="text-sm text-learning-text-secondary mb-1">{{ grammar.explanation }}</p>
-          <p v-if="showZh && grammar.explanation_zh" class="text-sm text-learning-accent-secondary mb-3">{{ grammar.explanation_zh }}</p>
+          <p v-if="showZh && grammar.explanation_zh" class="text-sm text-learning-chinese mb-3">{{ grammar.explanation_zh }}</p>
           <div v-if="grammar.examples && grammar.examples.length > 0">
             <p class="text-xs font-medium text-learning-text-muted uppercase tracking-wide mb-1">{{ t('Examples', '例句') }}:</p>
             <ul class="space-y-1">
@@ -251,7 +251,7 @@ const cefrLevelColor = (level: string | undefined) => {
                 class="text-sm text-learning-text-secondary pl-2 border-l-2 border-purple-500/30"
               >
                 {{ example }}
-                <span v-if="showZh && grammar.examples_zh && grammar.examples_zh[exIndex]" class="text-purple-400 text-xs ml-1">
+                <span v-if="showZh && grammar.examples_zh && grammar.examples_zh[exIndex]" class="text-learning-chinese text-xs ml-1">
                   {{ grammar.examples_zh[exIndex] }}
                 </span>
               </li>

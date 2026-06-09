@@ -52,14 +52,12 @@ class StatsService:
         }
 
     async def _count_words_learned(self) -> int:
-        """Count unique words learned from completed study sessions."""
+        """Count vocabulary items that have been reviewed at least once."""
+        from app.models.vocabulary import Vocabulary
         result = await self.session.execute(
-            select(func.count(func.distinct(StudyProgress.video_id))).where(
-                StudyProgress.completed.is_(True)
-            )
+            select(func.count()).where(Vocabulary.review_count > 0)
         )
-        count = result.scalar() or 0
-        return min(count * 10, 999)
+        return result.scalar() or 0
 
     async def _calculate_hours_learned(self) -> float:
         """Calculate total hours learned from all progress records."""

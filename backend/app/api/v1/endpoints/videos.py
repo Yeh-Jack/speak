@@ -76,6 +76,7 @@ def _transform_study_plan(sp) -> dict:
         "vocabulary": [_transform_vocabulary_item(v) for v in vocabulary],
         "grammar": [_transform_grammar_item(g) for g in grammar],
         "notes": sp.notes,
+        "notes_zh": getattr(sp, 'notes_zh', None),
         "overall_difficulty": sp.overall_difficulty,
         "estimated_time": sp.estimated_time,
         "created_at": sp.created_at.isoformat() if sp.created_at else None,
@@ -101,7 +102,16 @@ async def list_videos(
 ):
     """List all videos."""
     repo = VideoRepository(db)
-    return await repo.get_all(skip=skip, limit=limit)
+    videos = await repo.get_all(skip=skip, limit=limit)
+
+    study_plan_repo = StudyPlanRepository(db)
+    for video in videos:
+        overall_plan = await study_plan_repo.get_by_video_id(video.id)
+        if overall_plan:
+            video.study_plan_notes = overall_plan.notes
+            video.study_plan_notes_zh = getattr(overall_plan, 'notes_zh', None)
+
+    return videos
 
 
 @router.get("/{video_id}", response_model=Video)

@@ -12,6 +12,12 @@ export const useVideoStore = defineStore('video', () => {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
   const savedVocabulary = ref<Set<string>>(new Set());
+  const reviewedVocabulary = ref<Set<string>>(new Set());
+  const favoriteVocabulary = ref<Set<string>>(new Set());
+
+  const savedVocabularyCount = computed(() => savedVocabulary.value.size);
+  const reviewedVocabularyCount = computed(() => reviewedVocabulary.value.size);
+  const favoriteVocabularyCount = computed(() => favoriteVocabulary.value.size);
 
   const isCreatingVideo = ref(false);
   const createProgress = ref('');
@@ -108,16 +114,61 @@ export const useVideoStore = defineStore('video', () => {
     studyPlans.value = { ...studyPlans.value, objectives };
   }
 
-  function toggleVocabularySave(word: string) {
-    if (savedVocabulary.value.has(word)) {
-      savedVocabulary.value.delete(word);
+  async function toggleVocabularySave(word: string) {
+    const lowerWord = word.toLowerCase();
+    const { videoService } = await import('@/services/video.service');
+    const isFavorite = savedVocabulary.value.has(lowerWord);
+    if (isFavorite) {
+      savedVocabulary.value.delete(lowerWord);
+      favoriteVocabulary.value.delete(lowerWord);
     } else {
-      savedVocabulary.value.add(word);
+      savedVocabulary.value.add(lowerWord);
+      favoriteVocabulary.value.add(lowerWord);
+    }
+    try {
+      await videoService.toggleFavoriteVocabulary(word);
+    } catch (err) {
+      console.error('Failed to toggle favorite:', err);
     }
   }
 
   function isVocabularySaved(word: string): boolean {
-    return savedVocabulary.value.has(word);
+    return savedVocabulary.value.has(word.toLowerCase());
+  }
+
+  function isVocabularyFavorite(word: string): boolean {
+    return favoriteVocabulary.value.has(word.toLowerCase());
+  }
+
+  function markVocabularyReviewed(word: string) {
+    reviewedVocabulary.value.add(word.toLowerCase());
+  }
+
+  function isVocabularyReviewed(word: string): boolean {
+    return reviewedVocabulary.value.has(word.toLowerCase());
+  }
+
+  async function loadFavoriteVocabulary(): Promise<void> {
+    const { videoService } = await import('@/services/video.service');
+    try {
+      const favoriteWords = await videoService.getFavoriteVocabulary();
+      favoriteWords.forEach(word => {
+        favoriteVocabulary.value.add(word.toLowerCase());
+        savedVocabulary.value.add(word);
+      });
+    } catch (err) {
+      console.error('Failed to load favorite vocabulary:', err);
+    }
+  }
+
+  async function loadReviewedVocabulary(): Promise<void> {
+    const { videoService } = await import('@/services/video.service');
+    try {
+      const reviewedWords = await videoService.getReviewedVocabulary();
+      reviewedWords.forEach(word => reviewedVocabulary.value.add(word.toLowerCase()));
+    } catch (err) {
+      console.error('Failed to load reviewed vocabulary:', err);
+    }
   }
 
   function setLoading(loading: boolean) {
@@ -149,7 +200,7 @@ export const useVideoStore = defineStore('video', () => {
     createProgress.value = progress;
   }
 
-  return {
+return {
     currentVideo,
     chunks,
     currentChunkIndex,
@@ -167,6 +218,11 @@ export const useVideoStore = defineStore('video', () => {
     isLoading,
     error,
     savedVocabulary,
+    reviewedVocabulary,
+    favoriteVocabulary,
+    savedVocabularyCount,
+    reviewedVocabularyCount,
+    favoriteVocabularyCount,
     isCreatingVideo,
     createProgress,
     createdVideoId,
@@ -181,6 +237,11 @@ export const useVideoStore = defineStore('video', () => {
     toggleObjective,
     toggleVocabularySave,
     isVocabularySaved,
+    isVocabularyFavorite,
+    markVocabularyReviewed,
+    isVocabularyReviewed,
+    loadReviewedVocabulary,
+    loadFavoriteVocabulary,
     setLoading,
     setError,
     reset,

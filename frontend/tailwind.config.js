@@ -23,6 +23,8 @@ export default {
             secondary: '#94a3b8',
             muted: '#64748b',
           },
+          chinese: '#f5a623',
+          'chinese-muted': '#b8860b',
           surface: {
             DEFAULT: '#16213e',
             hover: '#1a2744',

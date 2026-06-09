@@ -18,11 +18,13 @@ interface Props {
   examplesZh?: string[];
   isSaved?: boolean;
   showZh?: boolean;
+  isReviewed?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   isSaved: false,
   showZh: true,
+  isReviewed: false,
 });
 
 const emit = defineEmits<{
@@ -44,6 +46,13 @@ const cefrColor = computed(() => {
     C2: 'bg-red-500/20 text-red-400 border-red-500/30',
   };
   return colors[props.cefrLevel || ''] || 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+});
+
+const cardBorderClass = computed(() => {
+  if (props.isReviewed) {
+    return 'border-green-500/50';
+  }
+  return 'border-learning-bg-tertiary';
 });
 
 function flipCard() {
@@ -91,7 +100,8 @@ function saveWord() {
       :style="{ transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }"
     >
       <div
-        class="absolute inset-0 backface-hidden bg-learning-surface rounded-xl p-5 border border-learning-bg-tertiary shadow-card hover:shadow-card-hover transition-shadow"
+        class="absolute inset-0 backface-hidden bg-learning-surface rounded-xl p-5 border shadow-card hover:shadow-card-hover transition-shadow"
+        :class="cardBorderClass"
         style="backface-visibility: hidden;"
       >
         <div class="flex flex-col h-full">
@@ -128,7 +138,7 @@ function saveWord() {
             <h3 class="text-2xl font-bold text-learning-text-primary mb-1 font-display">
               {{ word }}
             </h3>
-            <p v-if="showZh && wordZh" class="text-lg text-learning-accent-secondary mb-2">
+            <p v-if="showZh && wordZh" class="text-lg text-learning-chinese mb-2">
               {{ wordZh }}
             </p>
             <p v-if="pronunciation" class="text-sm text-learning-text-secondary mb-4">
@@ -172,7 +182,7 @@ function saveWord() {
             <p class="text-learning-text-primary leading-relaxed mb-2">
               {{ definition || 'No definition available' }}
             </p>
-            <p v-if="showZh && definitionZh" class="text-learning-accent-secondary leading-relaxed mb-4">
+            <p v-if="showZh && definitionZh" class="text-learning-chinese leading-relaxed mb-4">
               {{ definitionZh }}
             </p>
 
@@ -183,7 +193,7 @@ function saveWord() {
               <p class="text-sm text-learning-text-muted italic">
                 "{{ context }}"
               </p>
-              <p v-if="showZh && contextZh" class="text-sm text-learning-accent-secondary italic">
+              <p v-if="showZh && contextZh" class="text-sm text-learning-chinese italic">
                 "{{ contextZh }}"
               </p>
             </div>
@@ -199,7 +209,7 @@ function saveWord() {
                   class="text-sm text-learning-text-muted"
                 >
                   • {{ example }}
-                  <span v-if="showZh && examplesZh && examplesZh[index]" class="text-learning-accent-secondary text-xs ml-1">
+                  <span v-if="showZh && examplesZh && examplesZh[index]" class="text-learning-chinese text-xs ml-1">
                     {{ examplesZh[index] }}
                   </span>
                 </li>
@@ -209,6 +219,16 @@ function saveWord() {
 
           <div class="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
             <button
+              v-if="isReviewed"
+              class="text-xs text-green-400 flex items-center gap-1"
+            >
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+              </svg>
+              {{ t('Reviewed', '已複習') }}
+            </button>
+            <button
+              v-else
               @click.stop="emit('markReviewed', word)"
               class="text-xs text-learning-accent-tertiary hover:text-learning-accent-tertiary/80 transition-colors"
             >
