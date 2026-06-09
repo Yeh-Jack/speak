@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router';
 import { useVideoStore } from '@/stores/video.store';
+import { useI18n } from '@/composables/useI18n';
+import AppHeader from '@/components/layout/AppHeader.vue';
 
 const videoStore = useVideoStore();
+const { t } = useI18n();
 </script>
 
 <template>
   <div id="app">
+    <AppHeader />
     <div
       v-if="videoStore.isCreatingVideo"
       class="fixed top-4 right-4 z-50 flex items-center gap-3 px-5 py-3 bg-gradient-to-r from-learning-accent-primary/20 to-learning-accent-primary/10 backdrop-blur-sm border-2 border-learning-accent-primary rounded-xl shadow-lg shadow-learning-accent-primary/20"
@@ -16,7 +20,7 @@ const videoStore = useVideoStore();
         <div class="absolute inset-0 animate-ping w-6 h-6 border-2 border-learning-accent-primary/50 rounded-full"></div>
       </div>
       <div class="flex flex-col">
-        <span class="text-sm font-bold text-learning-accent-primary">Processing / 處理中</span>
+        <span class="text-sm font-bold text-learning-accent-primary">{{ t('Processing', '處理中') }}</span>
         <span class="text-xs text-learning-text-secondary">{{ videoStore.createProgress }}</span>
       </div>
     </div>

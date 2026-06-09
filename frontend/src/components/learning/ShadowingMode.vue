@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from 'vue';
 import BaseButton from '@/components/common/BaseButton.vue';
+import { useI18n } from '@/composables/useI18n';
+
+const { t } = useI18n();
 
 export interface ShadowingSentence {
   id: string;
@@ -290,7 +293,7 @@ onUnmounted(() => {
           <svg class="w-5 h-5 text-learning-accent-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
           </svg>
-          Shadowing Practice / 跟讀練習
+          {{ t('Shadowing Practice', '跟讀練習') }}
         </h2>
         <span class="text-sm text-learning-text-secondary">
           {{ currentSentenceIndex + 1 }} / {{ sentences.length }}
@@ -382,7 +385,7 @@ onUnmounted(() => {
             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
               <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z" />
             </svg>
-            <span class="text-sm">Original / 原始</span>
+            <span class="text-sm">{{ t('Original', '原始') }}</span>
           </button>
 
           <button
@@ -393,7 +396,7 @@ onUnmounted(() => {
             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
               <path d="M8 5v14l11-7z" />
             </svg>
-            <span class="text-sm">Playback / 播放</span>
+            <span class="text-sm">{{ t('Playback', '播放') }}</span>
           </button>
 
           <span
@@ -414,7 +417,7 @@ onUnmounted(() => {
       </div>
 
       <div v-else class="text-center py-8">
-        <p class="text-learning-text-muted mb-4">No sentences available for shadowing / 尚無可用於跟讀的句子</p>
+        <p class="text-learning-text-muted mb-4">{{ t('No sentences available for shadowing', '尚無可用於跟讀的句子') }}</p>
       </div>
 
       <div v-if="allCompleted" class="mt-6 p-4 bg-green-500/10 rounded-lg border border-green-500/20">
@@ -422,11 +425,11 @@ onUnmounted(() => {
           <svg class="w-6 h-6 text-green-400" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
           </svg>
-          <span class="text-green-400 font-medium">Practice Complete! / 練習完成！</span>
+          <span class="text-green-400 font-medium">{{ t('Practice Complete!', '練習完成！') }}</span>
         </div>
         <div class="flex justify-center mt-4 gap-2">
           <BaseButton variant="secondary" @click="restartPractice">
-            Practice Again / 再次練習
+            {{ t('Practice Again', '再次練習') }}
           </BaseButton>
         </div>
       </div>

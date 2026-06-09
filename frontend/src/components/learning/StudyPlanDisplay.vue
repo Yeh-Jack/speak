@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import BaseButton from '@/components/common/BaseButton.vue';
+import { useI18n } from '@/composables/useI18n';
+
+const { t } = useI18n();
 
 interface VocabularyItem {
   word: string;
@@ -112,7 +115,7 @@ const cefrLevelColor = (level: string | undefined) => {
     <div class="p-5 border-b border-learning-bg-tertiary">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-lg font-semibold font-display text-learning-text-primary">
-          Study Plan / 學習計劃
+          {{ t('Study Plan', '學習計劃') }}
         </h2>
         <span class="text-sm text-learning-text-secondary">
           Chunk {{ currentChunkIndex + 1 }} / {{ plan.totalChunks }}
@@ -121,7 +124,7 @@ const cefrLevelColor = (level: string | undefined) => {
 
       <div class="mb-4">
         <div class="flex items-center justify-between text-sm mb-2">
-          <span class="text-learning-text-secondary">Progress / 進度</span>
+          <span class="text-learning-text-secondary">{{ t('Progress', '進度') }}</span>
           <span class="text-learning-text-primary font-medium">{{ progress }}%</span>
         </div>
         <div class="h-2 bg-learning-bg-primary rounded-full overflow-hidden">
@@ -138,7 +141,7 @@ const cefrLevelColor = (level: string | undefined) => {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <span class="text-learning-text-secondary">
-            ~{{ plan.estimatedMinutes }} min / 分鐘
+            {{ t('~' + plan.estimatedMinutes + ' min', '約' + plan.estimatedMinutes + '分鐘') }}
           </span>
         </div>
         <div class="flex items-center gap-2">
@@ -146,7 +149,7 @@ const cefrLevelColor = (level: string | undefined) => {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
           </svg>
           <span class="text-learning-text-secondary">
-            {{ completedVocabulary }} words / 單詞
+            {{ t(completedVocabulary + ' words', completedVocabulary + ' 單詞') }}
           </span>
         </div>
         <div class="flex items-center gap-2">
@@ -154,7 +157,7 @@ const cefrLevelColor = (level: string | undefined) => {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
           <span class="text-learning-text-secondary">
-            {{ grammarItems.length }} patterns / 句型
+            {{ t(grammarItems.length + ' patterns', grammarItems.length + ' 句型') }}
           </span>
         </div>
       </div>
@@ -168,7 +171,7 @@ const cefrLevelColor = (level: string | undefined) => {
         class="flex-1 px-4 py-3 text-sm font-medium transition-colors relative"
         :class="activeTab === tab ? 'text-learning-accent-primary' : 'text-learning-text-secondary hover:text-learning-text-primary'"
       >
-        {{ tab === 'vocabulary' ? 'Vocabulary / 詞匯' : 'Grammar / 文法' }}
+        {{ tab === 'vocabulary' ? t('Vocabulary', '詞匯') : t('Grammar', '文法') }}
         <div
           v-if="activeTab === tab"
           class="absolute bottom-0 left-0 right-0 h-0.5 bg-learning-accent-primary"
@@ -204,7 +207,7 @@ const cefrLevelColor = (level: string | undefined) => {
           <p v-if="vocab.context" class="text-sm text-learning-text-muted italic mb-2">"{{ vocab.context }}"</p>
           <p v-if="showZh && vocab.context_zh" class="text-sm text-learning-accent-secondary/70 italic mb-2">"{{ vocab.context_zh }}"</p>
           <div v-if="vocab.examples && vocab.examples.length > 0">
-            <p class="text-xs font-medium text-learning-text-muted uppercase tracking-wide mb-1">Examples / 例句:</p>
+            <p class="text-xs font-medium text-learning-text-muted uppercase tracking-wide mb-1">{{ t('Examples', '例句') }}:</p>
             <ul class="space-y-1">
               <li
                 v-for="(example, exIndex) in vocab.examples"
@@ -220,7 +223,7 @@ const cefrLevelColor = (level: string | undefined) => {
           </div>
         </div>
         <p v-if="vocabularyItems.length === 0" class="text-center text-learning-text-muted py-4">
-          No vocabulary items / 暫無詞匯
+          {{ t('No vocabulary items', '暫無詞匯') }}
         </p>
       </div>
 
@@ -240,7 +243,7 @@ const cefrLevelColor = (level: string | undefined) => {
           <p class="text-sm text-learning-text-secondary mb-1">{{ grammar.explanation }}</p>
           <p v-if="showZh && grammar.explanation_zh" class="text-sm text-learning-accent-secondary mb-3">{{ grammar.explanation_zh }}</p>
           <div v-if="grammar.examples && grammar.examples.length > 0">
-            <p class="text-xs font-medium text-learning-text-muted uppercase tracking-wide mb-1">Examples / 例句:</p>
+            <p class="text-xs font-medium text-learning-text-muted uppercase tracking-wide mb-1">{{ t('Examples', '例句') }}:</p>
             <ul class="space-y-1">
               <li
                 v-for="(example, exIndex) in grammar.examples"
@@ -256,7 +259,7 @@ const cefrLevelColor = (level: string | undefined) => {
           </div>
         </div>
         <p v-if="grammarItems.length === 0" class="text-center text-learning-text-muted py-4">
-          No grammar patterns / 暫無句型
+          {{ t('No grammar patterns', '暫無句型') }}
         </p>
       </div>
     </div>

@@ -2,6 +2,8 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
 import { useVideoStore } from '@/stores';
+import { useLanguageStore } from '@/stores/language.store';
+import { useI18n } from '@/composables/useI18n';
 import { videoService } from '@/services/video.service';
 import VideoPlayer from '@/components/video/VideoPlayer.vue';
 import StudyPlanDisplay from '@/components/learning/StudyPlanDisplay.vue';
@@ -11,23 +13,20 @@ import type { TranscriptSegment } from '@/types';
 
 const route = useRoute();
 const videoStore = useVideoStore();
+const languageStore = useLanguageStore();
+const { t } = useI18n();
 
 const videoId = computed(() => route.params.id as string);
 
 const showShadowingMode = ref(false);
 const showVocabularyReview = ref(false);
 const showGrammarNotes = ref(false);
-const showZh = ref(true);
 const videoRef = ref<InstanceType<typeof VideoPlayer> | null>(null);
 const currentTime = ref(0);
 const isLoading = ref(false);
 const error = ref<string | null>(null);
 const videoSrc = ref('');
 const videoStatus = ref<'idle' | 'loading' | 'ready' | 'error'>('idle');
-
-function toggleZh() {
-  showZh.value = !showZh.value;
-}
 
 watch(() => videoStore.currentChunkIndex, (newIndex) => {
   const chunk = videoStore.chunks[newIndex];
@@ -243,39 +242,10 @@ onMounted(() => {
 
 <template>
   <div class="min-h-screen bg-learning-bg-primary">
-    <header class="sticky top-0 z-40 bg-learning-bg-secondary border-b border-learning-bg-tertiary">
-      <div class="container mx-auto px-4 py-4 flex items-center justify-between">
-        <div class="flex items-center gap-4">
-          <router-link to="/" class="text-xl font-bold font-display text-learning-text-primary">
-            Speak
-          </router-link>
-          <span class="text-learning-text-muted">/</span>
-          <span class="text-learning-text-secondary">Learning / 學習</span>
-        </div>
-        <div class="flex items-center gap-4">
-          <button
-            @click="toggleZh"
-            class="px-3 py-1.5 text-sm rounded border transition-colors"
-            :class="showZh
-              ? 'bg-learning-accent-primary text-white border-learning-accent-primary'
-              : 'bg-learning-bg-primary text-learning-text-secondary border-learning-bg-tertiary hover:border-learning-accent-primary'"
-          >
-            中文
-          </button>
-          <router-link
-            to="/"
-            class="text-sm text-learning-text-secondary hover:text-learning-text-primary transition-colors"
-          >
-            Back to Dashboard / 返回主頁
-          </router-link>
-        </div>
-      </div>
-    </header>
-
     <main class="container mx-auto px-4 py-6">
       <div v-if="isLoading" class="flex items-center justify-center py-12">
         <div class="animate-spin w-8 h-8 border-4 border-learning-accent-primary border-t-transparent rounded-full mr-4"></div>
-        <span class="text-learning-text-secondary">Loading video... / 載入中...</span>
+        <span class="text-learning-text-secondary">{{ t('Loading video...', '載入中...') }}</span>
       </div>
 
       <div v-else-if="error" class="bg-red-500/10 border border-red-500/20 rounded-xl p-6 text-red-400 text-center">
@@ -299,7 +269,7 @@ onMounted(() => {
                 ref="videoRef"
                 :src="videoSrc"
                 :transcript="currentTranscriptSegments"
-                :show-zh="showZh"
+                :show-zh="languageStore.showZh"
                 @time-update="handleTimeUpdate"
                 @paused="saveProgress"
               />
@@ -317,7 +287,7 @@ onMounted(() => {
                   <svg class="w-5 h-5 text-learning-accent-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
                   </svg>
-                  Chunks / 片段
+                  {{ t('Chunks', '片段') }}
                 </h3>
                 <span class="text-sm text-learning-text-secondary">
                   {{ videoStore.currentChunkIndex + 1 }} / {{ videoStore.chunks.length }}
@@ -358,7 +328,7 @@ onMounted(() => {
                   :examples="vocab.examples"
                   :examples-zh="vocab.examples_zh"
                   :is-saved="videoStore.isVocabularySaved(vocab.word)"
-                  :show-zh="showZh"
+:show-zh="languageStore.showZh"
                   @play-audio="handleVocabularyPlay"
                   @save-word="handleVocabularySave"
                 />
@@ -380,7 +350,7 @@ onMounted(() => {
               v-if="studyPlanProps"
               :plan="studyPlanProps.plan"
               :current-chunk-index="studyPlanProps.currentChunkIndex"
-              :show-zh="showZh"
+              :show-zh="languageStore.showZh"
               @start-learning="handleStartLearning"
               @toggle-objective="handleToggleObjective"
               @select-objective="handleSelectObjective"
@@ -388,16 +358,16 @@ onMounted(() => {
 
             <div v-else class="bg-learning-surface rounded-xl border border-learning-bg-tertiary p-5">
               <h3 class="text-lg font-semibold font-display text-learning-text-primary mb-4">
-                Study Plan / 學習計劃
+                {{ t('Study Plan', '學習計劃') }}
               </h3>
               <p class="text-learning-text-secondary text-sm">
-                No study plan available for this video yet. / 此影片尚無學習計劃。
+                {{ t('No study plan available for this video yet.', '此影片尚無學習計劃。') }}
               </p>
             </div>
 
             <div class="bg-learning-surface rounded-xl border border-learning-bg-tertiary p-5">
               <h3 class="text-lg font-semibold font-display text-learning-text-primary mb-4">
-                Quick Actions / 快速操作
+                {{ t('Quick Actions', '快速操作') }}
               </h3>
               <div class="space-y-3">
                 <button
@@ -410,8 +380,8 @@ onMounted(() => {
                     </svg>
                   </div>
                   <div>
-                    <p class="font-medium text-learning-text-primary">Shadowing Mode / 跟讀模式</p>
-                    <p class="text-sm text-learning-text-secondary">Practice speaking / 練習口說</p>
+                    <p class="font-medium text-learning-text-primary">{{ t('Shadowing Mode', '跟讀模式') }}</p>
+                    <p class="text-sm text-learning-text-secondary">{{ t('Practice speaking', '練習口說') }}</p>
                   </div>
                 </button>
 
@@ -425,8 +395,8 @@ onMounted(() => {
                     </svg>
                   </div>
                   <div>
-                    <p class="font-medium text-learning-text-primary">Review Vocabulary / 複習詞匯</p>
-                    <p class="text-sm text-learning-text-secondary">{{ videoStore.savedVocabulary.size }} saved / 已收藏</p>
+                    <p class="font-medium text-learning-text-primary">{{ t('Review Vocabulary', '複習詞匯') }}</p>
+                    <p class="text-sm text-learning-text-secondary">{{ t(`${videoStore.savedVocabulary.size} saved`, `${videoStore.savedVocabulary.size} 已收藏`) }}</p>
                   </div>
                 </button>
 
@@ -440,8 +410,8 @@ onMounted(() => {
                     </svg>
                   </div>
                   <div>
-                    <p class="font-medium text-learning-text-primary">Grammar Notes / 文法筆記</p>
-                    <p class="text-sm text-learning-text-secondary">{{ videoStore.grammarItems.length }} patterns / 句型</p>
+                    <p class="font-medium text-learning-text-primary">{{ t('Grammar Notes', '文法筆記') }}</p>
+                    <p class="text-sm text-learning-text-secondary">{{ t(`${videoStore.grammarItems.length} patterns`, `${videoStore.grammarItems.length} 句型`) }}</p>
                   </div>
                 </button>
               </div>
@@ -449,12 +419,12 @@ onMounted(() => {
 
             <div class="bg-learning-surface rounded-xl border border-learning-bg-tertiary p-5">
               <h3 class="text-lg font-semibold font-display text-learning-text-primary mb-4">
-                Progress / 進度
+                {{ t('Progress', '進度') }}
               </h3>
               <div class="space-y-4">
                 <div>
                   <div class="flex justify-between text-sm mb-2">
-                    <span class="text-learning-text-secondary">Vocabulary learned / 詞匯已學</span>
+                    <span class="text-learning-text-secondary">{{ t('Vocabulary learned', '詞匯已學') }}</span>
                     <span class="text-learning-text-primary">{{ videoStore.savedVocabulary.size }} / {{ videoStore.vocabularyItems.length }}</span>
                   </div>
                   <div class="h-2 bg-learning-bg-primary rounded-full overflow-hidden">
@@ -466,7 +436,7 @@ onMounted(() => {
                 </div>
                 <div>
                   <div class="flex justify-between text-sm mb-2">
-                    <span class="text-learning-text-secondary">Shadowing practice / 跟讀練習</span>
+                    <span class="text-learning-text-secondary">{{ t('Shadowing practice', '跟讀練習') }}</span>
                     <span class="text-learning-text-primary">{{ videoStore.completedObjectives }} / {{ shadowingSentences.length }}</span>
                   </div>
                   <div class="h-2 bg-learning-bg-primary rounded-full overflow-hidden">
@@ -478,7 +448,7 @@ onMounted(() => {
                 </div>
                 <div>
                   <div class="flex justify-between text-sm mb-2">
-                    <span class="text-learning-text-secondary">Grammar patterns / 文法句型</span>
+                    <span class="text-learning-text-secondary">{{ t('Grammar patterns', '文法句型') }}</span>
                     <span class="text-learning-text-primary">{{ videoStore.completedObjectives }} / {{ videoStore.grammarItems.length }}</span>
                   </div>
                   <div class="h-2 bg-learning-bg-primary rounded-full overflow-hidden">
@@ -498,7 +468,7 @@ onMounted(() => {
     <div v-if="showVocabularyReview" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showVocabularyReview = false">
       <div class="bg-learning-surface rounded-xl border border-learning-bg-tertiary w-full max-w-2xl max-h-[80vh] overflow-hidden">
         <div class="p-5 border-b border-learning-bg-tertiary flex items-center justify-between">
-          <h3 class="text-xl font-semibold font-display text-learning-text-primary">Vocabulary Review / 詞匯複習</h3>
+          <h3 class="text-xl font-semibold font-display text-learning-text-primary">{{ t('Vocabulary Review', '詞匯複習') }}</h3>
           <button @click="showVocabularyReview = false" class="text-learning-text-muted hover:text-learning-text-primary">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -536,7 +506,7 @@ onMounted(() => {
     <div v-if="showGrammarNotes" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showGrammarNotes = false">
       <div class="bg-learning-surface rounded-xl border border-learning-bg-tertiary w-full max-w-2xl max-h-[80vh] overflow-hidden">
         <div class="p-5 border-b border-learning-bg-tertiary flex items-center justify-between">
-          <h3 class="text-xl font-semibold font-display text-learning-text-primary">Grammar Notes / 文法筆記</h3>
+          <h3 class="text-xl font-semibold font-display text-learning-text-primary">{{ t('Grammar Notes', '文法筆記') }}</h3>
           <button @click="showGrammarNotes = false" class="text-learning-text-muted hover:text-learning-text-primary">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -554,7 +524,7 @@ onMounted(() => {
               <p class="text-sm text-learning-text-secondary mb-1">{{ grammar.explanation }}</p>
               <p v-if="grammar.explanation_zh" class="text-sm text-learning-accent-secondary mb-3">{{ grammar.explanation_zh }}</p>
               <div class="space-y-1">
-                <p class="text-xs font-medium text-learning-text-muted uppercase tracking-wide">Examples / 例句:</p>
+                <p class="text-xs font-medium text-learning-text-muted uppercase tracking-wide">{{ t('Examples', '例句') }}:</p>
                 <ul class="space-y-1">
                   <li v-for="(example, exIndex) in grammar.examples" :key="exIndex" class="text-sm text-learning-text-secondary pl-3 border-l-2 border-learning-accent-primary/30">
                     {{ example }}
