@@ -8,13 +8,7 @@ export const routes: RouteRecordRaw[] = [
     },
     {
         path: '/courses',
-        name: 'courses',
-        component: () => import('@/views/CourseListView.vue'),
-    },
-    {
-        path: '/courses/:id',
-        name: 'course-detail',
-        component: () => import('@/views/CourseDetailView.vue'),
+        redirect: '/',
     },
     {
         path: '/videos/:id',

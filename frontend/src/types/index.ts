@@ -16,17 +16,6 @@ export interface Video {
     study_plan_notes_zh?: string | null;
 }
 
-export interface CourseVideo {
-    id: string;
-    course_id: string;
-    video_id: string;
-    order_index: number;
-    video?: Video;
-    study_plan?: StudyPlan | null;
-    created_at: string;
-    updated_at: string;
-}
-
 export interface VideoChunk {
     id: string;
     video_id: string;
@@ -36,17 +25,6 @@ export interface VideoChunk {
     duration: number;
     transcript: any[] | null;
     status: string;
-    created_at: string;
-    updated_at: string;
-}
-
-export interface Course {
-    id: string;
-    title: string;
-    description: string | null;
-    status: string;
-    current_video_index: number;
-    course_videos: CourseVideo[];
     created_at: string;
     updated_at: string;
 }

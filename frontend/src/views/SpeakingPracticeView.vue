@@ -40,9 +40,6 @@ function startRecording() {
           <router-link to="/" class="text-learning-text-secondary hover:text-learning-text-primary transition-colors">
             Dashboard / 首頁
           </router-link>
-          <router-link to="/courses" class="text-learning-text-secondary hover:text-learning-text-primary transition-colors">
-            Courses / 課程
-          </router-link>
           <router-link to="/speaking" class="text-learning-accent-primary">
             Speaking / 口說
           </router-link>
@@ -108,16 +105,16 @@ function startRecording() {
                 </div>
                 <button
                   @click="startRecording"
-                  class="relative w-24 h-24 rounded-full transition-all"
+                  class="relative w-24 h-24 rounded-full transition-all flex items-center justify-center"
                   :class="isRecording
                     ? 'bg-red-500 animate-pulse'
                     : 'bg-learning-accent-primary hover:bg-learning-accent-primary/90'"
                 >
-                  <svg v-if="!isRecording" class="w-10 h-10 text-white ml-2" fill="currentColor" viewBox="0 0 24 24">
+                  <svg v-if="!isRecording" class="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
                     <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
                   </svg>
-                  <div v-else class="w-8 h-8 bg-white rounded-full mx-auto" />
+                  <div v-else class="w-8 h-8 bg-white rounded-full" />
                 </button>
               </div>
               <p class="text-learning-text-secondary text-center">

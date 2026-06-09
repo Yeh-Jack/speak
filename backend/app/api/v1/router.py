@@ -2,9 +2,10 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import chat, videos
+from app.api.v1.endpoints import chat, videos, stats
 
 api_router = APIRouter()
 
 api_router.include_router(videos.router, prefix="/videos", tags=["videos"])
 api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
+api_router.include_router(stats.router, prefix="/stats", tags=["stats"])
