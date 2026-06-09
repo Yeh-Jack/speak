@@ -172,6 +172,24 @@ export const videoService = {
       return null;
     }
   },
+
+  async reviewVocabulary(word: string, quality: number = 4): Promise<void> {
+    await api.post(`/vocabulary/${encodeURIComponent(word)}/review`, { quality });
+  },
+
+  async getReviewedVocabulary(): Promise<string[]> {
+    const response = await api.get<string[]>('/vocabulary/reviewed');
+    return response.data;
+  },
+
+  async getFavoriteVocabulary(): Promise<string[]> {
+    const response = await api.get<{ words: string[] }>('/vocabulary/favorites');
+    return response.data.words;
+  },
+
+  async toggleFavoriteVocabulary(word: string): Promise<void> {
+    await api.post(`/vocabulary/favorites/${encodeURIComponent(word)}/toggle`);
+  },
 };
 
 export default videoService;

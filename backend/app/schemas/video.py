@@ -105,6 +105,8 @@ class Video(VideoBase):
     like_count: int | None = None
     metadata_json: dict | None = None
     chunks: list[VideoChunk] = []
+    study_plan_notes: str | None = None
+    study_plan_notes_zh: str | None = None
     created_at: datetime
     updated_at: datetime
 

@@ -1,6 +1,5 @@
 """Vocabulary repository."""
 
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -41,5 +40,19 @@ class VocabularyRepository(BaseRepository[Vocabulary]):
         """Search vocabulary by word prefix."""
         result = await self.session.execute(
             select(Vocabulary).where(Vocabulary.word.like(f"{query.lower()}%")).limit(limit)
+        )
+        return list(result.scalars().all())
+
+    async def get_reviewed_words(self) -> list[str]:
+        """Get all words that have been reviewed at least once."""
+        result = await self.session.execute(
+            select(Vocabulary.word).where(Vocabulary.review_count > 0)
+        )
+        return [row[0] for row in result.fetchall()]
+
+    async def get_favorites(self) -> list[Vocabulary]:
+        """Get all favorite vocabulary items."""
+        result = await self.session.execute(
+            select(Vocabulary).where(Vocabulary.is_favorite == True)
         )
         return list(result.scalars().all())

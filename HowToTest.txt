@@ -8,11 +8,13 @@ cd backend/
 uv venv
 source .venv/bin/activate
 uv pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu125
-uv pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu130
+uv pip install --force-reinstall --no-cache --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu130 llama-cpp-python
 uv sync
 
 # 1. Run tests.
 uv run pytest tests/unit/ -v
+curl http://localhost:8080/api/v1/llm/gpu-status - Returns GPU detection status and LLM configuration
+curl http://localhost:8080/api/v1/llm/llm-health - Forces model init and returns health + GPU status
 
 # 2. Start the backend server.
 uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
@@ -22,11 +24,12 @@ curl -X POST http://localhost:8080/api/v1/videos/info \
   -H "Content-Type: application/json" \
   -d '{"youtube_url": "https://www.youtube.com/watch?v=SPGn9MZb1a0"}'
 
-House of the Dragon Season 3 : https://www.youtube.com/watch?v=i6w7O1kwuBk
-Lilith : https://www.youtube.com/watch?v=Lf2UZXrFVtY
 Medusa : https://www.youtube.com/watch?v=3OSkg0JudmU
+Lilith : https://www.youtube.com/watch?v=Lf2UZXrFVtY
+House of the Dragon Season 3 : https://www.youtube.com/watch?v=i6w7O1kwuBk
 Toy Story 5 : https://www.youtube.com/watch?v=fh7MTAQGxEg
 RTX Spark : https://www.youtube.com/watch?v=H4nJo-oqAro
+NVIDIA GTC : https://www.youtube.com/watch?v=SPGn9MZb1a0
 
 # 4. Create video from YouTube (test with a short video)
 curl -X POST http://localhost:8080/api/v1/videos/youtube \
@@ -55,7 +58,7 @@ curl -X PATCH "http://localhost:8080/api/v1/videos/{video_id}" \
   -d '{"status": "chunking_complete"}'
 
 # 9. Retry downloading:
-curl -X POST "http://localhost:8000/api/v1/videos/{video_id}/retry"
+curl -X POST "http://localhost:8080/api/v1/videos/d0a57cb8-7a0b-46ff-bfdb-c8ec0207ca14/retry"
 
 # 10. Get video chunks
 curl http://localhost:8080/api/v1/videos/{video_id}/chunks
@@ -125,7 +128,15 @@ B. NVIDIA driver installation notes:
       ex: CUDA-12.5 for Tesla P100.
    3. Install the llama-cpp-python with the corresponding cuda (tools-kit) version.
       ex: uv pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu125
-C. SSE (Server-Sent Events) - A server-push technology where the server sends data to the client over HTTP, one-way communication.
+C. CUDA wheels for llama-cpp-python are typically built for Python 3.10–3.12
+    Python 3.14 = no prebuilt CUDA wheel available
+    So uv/pip silently falls back to CPU build from source
+    -----   Downgrade to 3.12 version   -----
+    uv python install 3.12
+    uv venv --python 3.12
+    uv pip install --force-reinstall --no-cache --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu130 llama-cpp-python
+    uv sync
+D. SSE (Server-Sent Events) - A server-push technology where the server sends data to the client over HTTP, one-way communication.
    Use case for this project:
     - The single HTTP request stays open and the server pushes data chunks through it. No new connection needed.
     - Backend sends tokens one-by-one as LLM generates them

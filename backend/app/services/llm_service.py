@@ -164,6 +164,11 @@ Generate a study plan in the following JSON format:
     "notes_zh": "給學習者的額外教學筆記（繁體中文）"
 }}
 
+IMPORTANT: Keep the output concise to avoid truncation.
+- vocabulary: Include ONLY 5 items maximum
+- grammar: Include ONLY 3 items maximum
+- chunks: Include ONLY 2 chunks maximum
+
 CRITICAL REQUIREMENTS:
 1. Every text/string field in the JSON output MUST have a corresponding Chinese translation field with "_zh" suffix. This applies to ALL nested objects including vocabulary items, grammar items, and chunk objects. Do NOT omit any translation fields.
 2. ALL Chinese translations MUST be in TRADITIONAL Chinese (繁體中文) ONLY. Do NOT use Simplified Chinese (簡體中文). Examples: use 學習 not 学习, 詞匯 not 词汇, 影片 not 电影.
@@ -298,10 +303,36 @@ Only return the JSON, no other text. Ensure the JSON is complete and valid."""
                     return json.loads(json_str)
                 except json.JSONDecodeError:
                     pass
+            truncated_json = self._fix_truncated_json(response)
+            if truncated_json:
+                return truncated_json
             logger.warning(f"Failed to parse LLM response: {e}, response length: {len(response)}")
             logger.warning(f"Raw LLM response (first 1000 chars): {response[:1000]}")
             logger.warning(f"Raw LLM response (last 500 chars): {response[-500:]}")
             raise
+
+    def _fix_truncated_json(self, response: str) -> dict | None:
+        """Attempt to fix JSON truncated mid-string.
+
+        When LLM output is cut off mid-string (e.g., "difficulty": "medium
+        without closing quote), finds the last valid JSON boundary and truncates there.
+        """
+        msg = str(response)
+        quote_count = msg.count('"')
+        if quote_count % 2 != 0:
+            last_quote = msg.rfind('"')
+            if last_quote > len(msg) // 2:
+                truncated = msg[:last_quote]
+                last_brace = truncated.rfind("}") + 1
+                if last_brace > 0:
+                    truncated = truncated[:last_brace]
+                    try:
+                        result = json.loads(truncated)
+                        logger.info(f"Fixed truncated JSON by truncating at unclosed string (char {last_quote})")
+                        return result
+                    except json.JSONDecodeError:
+                        pass
+        return None
 
     def _validate_study_plan(self, plan: dict, video_title: str, video_duration: float) -> dict:
         """Validate and fill in missing fields with defaults."""

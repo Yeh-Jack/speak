@@ -25,6 +25,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   sentenceComplete: [sentenceId: string];
   practiceComplete: [];
+  close: [];
 }>();
 
 const isRecording = ref(false);
@@ -37,6 +38,7 @@ const isPlayingPractice = ref(false);
 const userScore = ref<Record<string, number>>({});
 const recognizedText = ref<string>('');
 const waveformBars = ref<number[]>(new Array(32).fill(8));
+const recordingError = ref<string>('');
 
 let mediaRecorder: MediaRecorder | null = null;
 let audioContext: AudioContext | null = null;
@@ -118,6 +120,13 @@ function calculateSimilarity(str1: string, str2: string): number {
 }
 
 async function startRecording() {
+  recordingError.value = '';
+  
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    recordingError.value = t('Recording not supported in this browser', '此瀏覽器不支援錄音');
+    return;
+  }
+  
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
@@ -174,8 +183,19 @@ async function startRecording() {
     }
 
     updateWaveform();
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to start recording:', error);
+    if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+      recordingError.value = t('Microphone access denied. Please allow microphone permission.', '麥克風權限被拒絕。請允許麥克風權限。');
+    } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+      recordingError.value = t('No microphone found. Please connect a microphone.', '未找到麥克風。請連接麥克風。');
+    } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+      recordingError.value = t('Microphone is being used by another application.', '麥克風正在被其他應用程式使用。');
+    } else if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+      recordingError.value = t('Recording requires HTTPS. Please use HTTPS or localhost.', '錄音需要 HTTPS。請使用 HTTPS 或 localhost。');
+    } else {
+      recordingError.value = t('Failed to start recording. Please try again.', '無法開始錄音。請重試。');
+    }
   }
 }
 
@@ -295,9 +315,19 @@ onUnmounted(() => {
           </svg>
           {{ t('Shadowing Practice', '跟讀練習') }}
         </h2>
-        <span class="text-sm text-learning-text-secondary">
-          {{ currentSentenceIndex + 1 }} / {{ sentences.length }}
-        </span>
+        <div class="flex items-center gap-3">
+          <span class="text-sm text-learning-text-secondary">
+            {{ currentSentenceIndex + 1 }} / {{ sentences.length }}
+          </span>
+          <button
+            @click="emit('close')"
+            class="p-1 rounded hover:bg-learning-bg-primary transition-colors"
+          >
+            <svg class="w-5 h-5 text-learning-text-muted hover:text-learning-text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div class="h-2 bg-learning-bg-primary rounded-full overflow-hidden">
@@ -334,6 +364,10 @@ onUnmounted(() => {
           />
         </div>
 
+        <div v-if="recordingError" class="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+          <p class="text-red-400 text-sm text-center">{{ recordingError }}</p>
+        </div>
+
         <div class="flex items-center justify-center gap-3 mb-4">
           <button
             @click="previousSentence"
@@ -367,9 +401,9 @@ onUnmounted(() => {
 
           <button
             @click="nextSentence"
-            :disabled="!recordedBlob && !userScore[currentSentence.id]"
+            :disabled="currentSentenceIndex >= sentences.length - 1"
             class="p-2 rounded-lg transition-colors disabled:opacity-50"
-            :class="!recordedBlob && !userScore[currentSentence.id] ? 'text-gray-600' : 'text-learning-text-secondary hover:bg-learning-bg-primary'"
+            :class="currentSentenceIndex >= sentences.length - 1 ? 'text-gray-600' : 'text-learning-text-secondary hover:bg-learning-bg-primary'"
           >
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />

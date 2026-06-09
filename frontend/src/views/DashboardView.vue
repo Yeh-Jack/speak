@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, onActivated, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
 import { useI18n } from '@/composables/useI18n';
@@ -61,6 +61,8 @@ const recentVideos = computed(() =>
     duration: formatDuration(v.duration),
     progress: v.status === 'ready' ? 0 : 0,
     thumbnail: v.thumbnail || `https://picsum.photos/seed/${v.id}/320/180`,
+    notes: v.study_plan_notes || '',
+    notesZh: v.study_plan_notes_zh || '',
   }))
 );
 
@@ -155,6 +157,10 @@ onMounted(() => {
   fetchVideos();
   fetchDashboardStats();
 });
+
+onActivated(() => {
+  fetchDashboardStats();
+});
 </script>
 
 <template>
@@ -163,7 +169,7 @@ onMounted(() => {
       <div class="mb-8 flex items-center justify-between">
         <div>
           <h1 class="text-3xl font-bold font-display text-learning-text-primary mb-2">
-            {{ t('Welcome back,', '歡迎回來') }}, {{ user?.email?.split('@')[0] }}! {{ t('', '！') }}
+            {{ t('Welcome back', '歡迎回來') }}！
           </h1>
           <p class="text-learning-text-secondary">{{ t('Continue your English learning journey', '繼續您的英語學習之旅') }}</p>
         </div>
@@ -267,14 +273,14 @@ onMounted(() => {
           </button>
         </div>
 
-        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           <div
             v-for="video in recentVideos"
             :key="video.id"
             @click="goToVideo(video.id)"
             class="bg-learning-surface rounded-xl overflow-hidden border border-learning-bg-tertiary cursor-pointer card-interactive group"
           >
-            <div class="relative aspect-video bg-learning-bg-primary">
+            <div class="relative bg-learning-bg-primary h-40">
               <img :src="video.thumbnail" :alt="video.title" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
               <div class="absolute inset-0 flex items-center justify-center">
                 <div class="w-12 h-12 rounded-full bg-learning-accent-primary/90 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -288,8 +294,12 @@ onMounted(() => {
               </span>
             </div>
             <div class="p-4">
-              <h3 class="font-medium text-learning-text-primary mb-2">{{ video.title }}</h3>
-              <div class="flex items-center gap-2">
+              <h3 class="font-medium text-learning-text-primary mb-1 line-clamp-2">{{ video.title }}</h3>
+              <div v-if="video.notes || video.notesZh" class="mt-2">
+                <p v-if="video.notes" class="text-sm text-learning-text-secondary">{{ video.notes }}</p>
+                <p v-if="languageStore.showZh && video.notesZh" class="text-sm text-learning-chinese">{{ video.notesZh }}</p>
+              </div>
+              <div class="flex items-center gap-2 mt-3">
                 <div class="flex-1 h-1.5 bg-learning-bg-primary rounded-full overflow-hidden">
                   <div
                     class="h-full bg-learning-accent-primary rounded-full"
