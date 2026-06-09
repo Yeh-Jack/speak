@@ -2,10 +2,14 @@
 cd /workspaces/education/backend
 
 # 0. Install uv and initiate virtual environment.
+sudo apt update && sudo apt install -y ffmpeg
 curl -LsSf https://astral.sh/uv/install.sh | sh
+cd backend/
 uv venv
+source .venv/bin/activate
 uv pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu125
 uv pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu130
+uv sync
 
 # 1. Run tests.
 uv run pytest tests/unit/ -v
@@ -22,11 +26,12 @@ House of the Dragon Season 3 : https://www.youtube.com/watch?v=i6w7O1kwuBk
 Lilith : https://www.youtube.com/watch?v=Lf2UZXrFVtY
 Medusa : https://www.youtube.com/watch?v=3OSkg0JudmU
 Toy Story 5 : https://www.youtube.com/watch?v=fh7MTAQGxEg
+RTX Spark : https://www.youtube.com/watch?v=H4nJo-oqAro
 
 # 4. Create video from YouTube (test with a short video)
 curl -X POST http://localhost:8080/api/v1/videos/youtube \
   -H "Content-Type: application/json" \
-  -d '{"youtube_url": "https://www.youtube.com/watch?v=H4nJo-oqAro", "chunk_duration": 30}'
+  -d '{"youtube_url": "https://www.youtube.com/watch?v=3OSkg0JudmU", "chunk_duration": 30}'
 
 # 5. List videos
 curl http://localhost:8080/api/v1/videos
@@ -173,3 +178,8 @@ Flow:
 2. _get_next pulls next token from generator (also in thread pool)
 3. Main loop runs in async context, yielding tokens to caller
 4. When StopIteration occurs, _get_next returns None → break
+
+
+# References
+1. llama-cpp-python (Python Bindings for llama.cpp)
+    https://github.com/abetlen/llama-cpp-python

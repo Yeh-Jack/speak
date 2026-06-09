@@ -207,7 +207,6 @@ PROJECT_ROOT/data/
 │       ├── chunk_0.mp3 # Audio for chunk 0
 │       ├── chunk_1.mp3 # Audio for chunk 1
 │       └── ...
-└── courses/            # Course data
 ```
 
 In Docker: PROJECT_ROOT is explicitly set to `/app` via environment variable, so data is at `/app/data/`

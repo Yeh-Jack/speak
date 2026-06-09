@@ -24,6 +24,10 @@ const dashboardStats = ref({
   hoursLearned: 0,
   streakDays: 0,
   sentencesPracticed: 0,
+  dailyGoalMinutes: 30,
+  dailyGoalProgress: 0,
+  dailyGoalRemaining: 30,
+  todayMinutes: 0,
 });
 const statsLoading = ref(true);
 
@@ -40,6 +44,10 @@ const stats = computed(() => ({
   hoursLearned: dashboardStats.value.hoursLearned,
   streakDays: dashboardStats.value.streakDays,
   sentencesPracticed: dashboardStats.value.sentencesPracticed,
+  dailyGoalMinutes: dashboardStats.value.dailyGoalMinutes,
+  dailyGoalProgress: dashboardStats.value.dailyGoalProgress,
+  dailyGoalRemaining: dashboardStats.value.dailyGoalRemaining,
+  todayMinutes: dashboardStats.value.todayMinutes,
 }));
 
 const recentVideos = computed(() =>
@@ -60,10 +68,6 @@ function formatDuration(seconds: number): string {
 
 function goToVideo(videoId: string) {
   router.push(`/videos/${videoId}`);
-}
-
-function goToCourses() {
-  router.push('/courses');
 }
 
 function goToSpeaking() {
@@ -131,6 +135,10 @@ async function fetchDashboardStats() {
       hoursLearned: data.hours_learned,
       streakDays: data.streak_days,
       sentencesPracticed: data.sentences_practiced,
+      dailyGoalMinutes: data.daily_goal_minutes,
+      dailyGoalProgress: data.daily_goal_progress,
+      dailyGoalRemaining: data.daily_goal_remaining,
+      todayMinutes: data.today_minutes,
     };
   } catch (err: any) {
     console.error('Failed to fetch dashboard stats:', err);
@@ -155,9 +163,6 @@ onMounted(() => {
         <nav class="flex items-center gap-6">
           <router-link to="/" class="text-learning-accent-primary transition-colors">
             Dashboard / 首頁
-          </router-link>
-          <router-link to="/courses" class="text-learning-text-secondary hover:text-learning-text-primary transition-colors">
-            Courses / 課程
           </router-link>
           <router-link to="/speaking" class="text-learning-text-secondary hover:text-learning-text-primary transition-colors">
             Speaking / 口說
@@ -251,19 +256,14 @@ onMounted(() => {
             <span class="text-learning-text-primary text-sm font-medium">Daily Goal / 每日目標</span>
           </div>
           <div class="h-2 bg-learning-bg-primary rounded-full overflow-hidden mb-2">
-            <div class="h-full bg-gradient-to-r from-learning-accent-primary to-learning-accent-secondary rounded-full" style="width: 65%" />
+            <div class="h-full bg-gradient-to-r from-learning-accent-primary to-learning-accent-secondary rounded-full" :style="{ width: stats.dailyGoalProgress + '%' }" />
           </div>
-          <p class="text-xs text-learning-text-muted">10 min remaining / 還剩10分鐘</p>
+          <p class="text-xs text-learning-text-muted">{{ stats.dailyGoalRemaining }} min remaining / 還剩{{ stats.dailyGoalRemaining }}分鐘</p>
         </div>
       </div>
 
       <div class="mb-8">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-xl font-semibold font-display text-learning-text-primary">Continue Learning / 繼續學習</h2>
-          <button class="text-sm text-learning-accent-secondary hover:text-learning-accent-secondary/80 transition-colors" @click="goToCourses">
-            View All / 查看全部
-          </button>
-        </div>
+        <h2 class="text-xl font-semibold font-display text-learning-text-primary mb-4">Continue Learning / 繼續學習</h2>
 
         <div v-if="isLoading" class="flex items-center justify-center py-12">
           <div class="animate-spin w-8 h-8 border-4 border-learning-accent-primary border-t-transparent rounded-full"></div>

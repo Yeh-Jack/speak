@@ -126,8 +126,7 @@ PROJECT_ROOT/data/
 ├── videos/             # Downloaded from YouTube (original file)
 ├── subtitles/          # Downloaded auto-generated subtitles (.json3, .vtt, .srt, .ass, .lrc)
 ├── transcripts/        # JSON (YouTube subtitles or Whisper output)
-├── audios/             # Extracted audio for Whisper
-└── courses/            # Course data
+└── audios/             # Extracted audio for Whisper
 ```
 
 In Docker: PROJECT_ROOT is `/app`, so data is at `/app/data/`
