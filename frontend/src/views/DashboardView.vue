@@ -76,9 +76,7 @@ function goToVideo(videoId: string) {
   router.push(`/videos/${videoId}`);
 }
 
-function goToSpeaking() {
-  router.push('/speaking');
-}
+
 
 function openAddModal() {
   showAddModal.value = true;

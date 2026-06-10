@@ -25,10 +25,10 @@ Users submit YouTube URLs (movies, TV shows, TED talks) and the system generates
 
 ### Local Development
 
-**Backend:**
+**Backend (on Linux):**
 ```bash
-# Install ffmpeg
-sudo apt update && sudo apt install -y ffmpeg
+# Install ffmpeg (example for Debian/Ubuntu)
+sudo apt update && sudo apt install -y curl ffmpeg openssl
 
 # Install uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -46,6 +46,12 @@ openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 -node
 
 # Install dependent packages.
 uv sync
+
+# Configure the virtual environment.
+cp .env.example .env
+vi .env
+cp ../frontend/.env.example ../frontend/.env
+vi ../frontend/.env
 
 # Start the backend server (also serves the frontend, PROJECT_ROOT is for serving frontend).
 PROJECT_ROOT=/project/path uv run --python 3.12 uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload --ssl-keyfile key.pem --ssl-certfile cert.pem

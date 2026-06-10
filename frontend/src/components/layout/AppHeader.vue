@@ -26,9 +26,6 @@ const isLearningPage = route.path.startsWith('/videos/');
         <router-link to="/" class="text-learning-text-secondary hover:text-learning-text-primary transition-colors">
           {{ t('Dashboard', '首頁') }}
         </router-link>
-        <router-link to="/speaking" class="text-learning-text-secondary hover:text-learning-text-primary transition-colors">
-          {{ t('Speaking', '口說') }}
-        </router-link>
       </nav>
       <div class="flex items-center gap-3">
         <button

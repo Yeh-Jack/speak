@@ -15,11 +15,7 @@ export const routes: RouteRecordRaw[] = [
         name: 'video-player',
         component: () => import('@/views/VideoPlayerView.vue'),
     },
-    {
-        path: '/speaking',
-        name: 'speaking-practice',
-        component: () => import('@/views/SpeakingPracticeView.vue'),
-    },
+    
     {
         path: '/settings',
         name: 'settings',
