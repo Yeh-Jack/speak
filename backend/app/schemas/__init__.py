@@ -5,13 +5,12 @@ from app.schemas.study_plan import StudyPlan, StudyPlanCreate, StudyPlanUpdate
 from app.schemas.video import (
     Video,
     VideoChunk,
-    VideoChunkCreate,
     VideoChunkUpdate,
     VideoCreate,
     VideoResponse,
     VideoUpdate,
 )
-from app.schemas.vocabulary import Vocabulary, VocabularyCreate, VocabularyReview, VocabularyUpdate
+from app.schemas.vocabulary import Vocabulary, VocabularyReview, VocabularyUpdate
 
 __all__ = [
     # Video
@@ -32,7 +31,6 @@ __all__ = [
     "StudyProgressUpdate",
     # Vocabulary
     "Vocabulary",
-    "VocabularyCreate",
     "VocabularyUpdate",
     "VocabularyReview",
 ]

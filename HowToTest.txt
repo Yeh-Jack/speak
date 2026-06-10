@@ -17,7 +17,9 @@ curl http://localhost:8080/api/v1/llm/gpu-status - Returns GPU detection status 
 curl http://localhost:8080/api/v1/llm/llm-health - Forces model init and returns health + GPU status
 
 # 2. Start the backend server.
-uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
+# --- Add PROJECT_ROOT to serve frontend from the backend server.
+# --- Add --ssl-keyfile key.pem --ssl-certfile cert.pem to serve HTTPS which is required for MediaRecorder (use microphone).
+PROJECT_ROOT=/workspaces/speak uv run --python 3.12 uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload --ssl-keyfile key.pem --ssl-certfile cert.pem
 
 # 3. Get video information
 curl -X POST http://localhost:8080/api/v1/videos/info \
@@ -152,44 +154,48 @@ D. SSE (Server-Sent Events) - A server-push technology where the server sends da
    The challenge: llama-cpp-python's create_chat_completion with stream=True is a blocking iterator
    that must run in a thread to avoid blocking the event loop.
 
-1. Main async code calls loop.run_in_executor to run _stream_tokens in thread pool
-2. _stream_tokens is a generator that yields tokens from the LLM
-3. The while loop continuously pulls tokens using _get_next (also run in executor)
-4. Tokens are yielded back to the async caller
-I'll create a simple ASCII/text diagram.
-┌─────────────────────────────────────────────────────────────┐
-│                      Async Caller                           │
-└─────────────────────┬───────────────────────────────────────┘
-                      │ yields token
-                      ▼
-┌─────────────────────────────────────────────────────────────┐
-│  while True:                                                │
-│    token = await loop.run_in_executor(None, _get_next, gen) │
-│    if token is None: break                                  │
-│    yield token                                              │
-└─────────────────────┬───────────────────────────────────────┘
-                      │ run in thread pool
-                      ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Thread Pool Executor (None = default)                      │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │  _get_next(gen)         _stream_tokens()               │ │
-│  │       │                        │                       │ │
-│  │       │                        ▼                       │ │
-│  │       │                 ┌──────────────┐               │ │
-│  │       │                 │  LLM Model   │               │ │
-│  │       │                 │  (blocking)  │               │ │
-│  │       │                 └──────┬───────┘               │ │
-│  │       │                        │                       │ │
-│  │       │◄───────── yields ──────┘                       │ │
-│  └───────┴────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
-Flow:
-1. _stream_tokens runs in thread pool, blocking on LLM
-2. _get_next pulls next token from generator (also in thread pool)
-3. Main loop runs in async context, yielding tokens to caller
-4. When StopIteration occurs, _get_next returns None → break
+  1. Main async code calls loop.run_in_executor to run _stream_tokens in thread pool
+  2. _stream_tokens is a generator that yields tokens from the LLM
+  3. The while loop continuously pulls tokens using _get_next (also run in executor)
+  4. Tokens are yielded back to the async caller
+  I'll create a simple ASCII/text diagram.
+  ┌─────────────────────────────────────────────────────────────┐
+  │                      Async Caller                           │
+  └─────────────────────┬───────────────────────────────────────┘
+                        │ yields token
+                        ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │  while True:                                                │
+  │    token = await loop.run_in_executor(None, _get_next, gen) │
+  │    if token is None: break                                  │
+  │    yield token                                              │
+  └─────────────────────┬───────────────────────────────────────┘
+                        │ run in thread pool
+                        ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │  Thread Pool Executor (None = default)                      │
+  │  ┌────────────────────────────────────────────────────────┐ │
+  │  │  _get_next(gen)         _stream_tokens()               │ │
+  │  │       │                        │                       │ │
+  │  │       │                        ▼                       │ │
+  │  │       │                 ┌──────────────┐               │ │
+  │  │       │                 │  LLM Model   │               │ │
+  │  │       │                 │  (blocking)  │               │ │
+  │  │       │                 └──────┬───────┘               │ │
+  │  │       │                        │                       │ │
+  │  │       │◄───────── yields ──────┘                       │ │
+  │  └───────┴────────────────────────────────────────────────┘ │
+  └─────────────────────────────────────────────────────────────┘
+  Flow:
+  1. _stream_tokens runs in thread pool, blocking on LLM
+  2. _get_next pulls next token from generator (also in thread pool)
+  3. Main loop runs in async context, yielding tokens to caller
+  4. When StopIteration occurs, _get_next returns None → break
 
+E. Browser requires HTTPS for MediaRecorder. getUserMedia requires a secure context (HTTPS or localhost).
+  # Generate self-signed certificate in backend directory
+  cd /workspaces/speak/backend
+  openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=192.168.1.109"
 
 # References
 1. llama-cpp-python (Python Bindings for llama.cpp)

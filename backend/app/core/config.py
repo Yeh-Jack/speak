@@ -15,6 +15,9 @@ if _env_root:
 else:
     PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 
+# Frontend dist folder (served as static files)
+FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
+
 # Fixed system constants - relative to PROJECT_ROOT
 DATA_DIR = PROJECT_ROOT / "data"
 DATABASE_URL: str = f"sqlite+aiosqlite:///{DATA_DIR}/db/learning.db"
@@ -43,6 +46,9 @@ class Settings(BaseSettings):
     ENVIRONMENT: Literal["development", "production", "test"] = "development"
     DEBUG: bool = True
     LOG_LEVEL: str = "INFO"
+
+    BACKEND_URL: str = "http://localhost:8080"
+    CORS_ALLOW_ORIGINS: str = "*"
 
     class Config:
         env_file = ".env"

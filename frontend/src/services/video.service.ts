@@ -79,18 +79,8 @@ export const videoService = {
   },
 
   async getStudyPlans(videoId: string): Promise<StudyPlanResponse[]> {
-    console.log('videoService.getStudyPlans called with:', videoId);
-    try {
-      const response = await api.get<StudyPlanResponse[]>(`/videos/${videoId}/study-plans`);
-      console.log('videoService.getStudyPlans response status:', response.status);
-      console.log('videoService.getStudyPlans response data length:', response.data?.length);
-      return response.data;
-    } catch (err: any) {
-      console.error('videoService.getStudyPlans error:', err.message);
-      console.error('videoService.getStudyPlans error response:', err.response?.data);
-      console.error('videoService.getStudyPlans error status:', err.response?.status);
-      throw err;
-    }
+    const response = await api.get<StudyPlanResponse[]>(`/videos/${videoId}/study-plans`);
+    return response.data;
   },
 
   async getStudyPlan(videoId: string, chunkIndex: number): Promise<StudyPlanResponse> {
@@ -139,16 +129,25 @@ export const videoService = {
   },
 
   async getAudioUrl(videoId: string, chunkIndex?: number): Promise<string> {
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-    if (chunkIndex !== undefined) {
-      return `${baseUrl}/api/v1/videos/${videoId}/chunks/${chunkIndex}/audio`;
+    // Wait for config if needed
+    if ((window as any).__API_CONFIG_PROMISE__) {
+      await (window as any).__API_CONFIG_PROMISE__;
     }
-    return `${baseUrl}/api/v1/videos/${videoId}/audio`;
+    const baseUrl = (window as any).__API_URL__ || '';
+    const path = chunkIndex !== undefined
+      ? `/api/v1/videos/${videoId}/chunks/${chunkIndex}/audio`
+      : `/api/v1/videos/${videoId}/audio`;
+    return baseUrl ? `${baseUrl}${path}` : path;
   },
 
   async getStreamUrl(videoId: string): Promise<string> {
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-    return `${baseUrl}/api/v1/videos/${videoId}/stream`;
+    // Wait for config if needed
+    if ((window as any).__API_CONFIG_PROMISE__) {
+      await (window as any).__API_CONFIG_PROMISE__;
+    }
+    const baseUrl = (window as any).__API_URL__ || '';
+    const path = `/api/v1/videos/${videoId}/stream`;
+    return baseUrl ? `${baseUrl}${path}` : path;
   },
 
   async saveProgress(

@@ -40,14 +40,18 @@ cd backend
 uv venv
 source .venv/bin/activate
 
+# HTTPS is required for audio recording from microphone by MediaRecorder.
+# Generate a self-signed SSL certificate for running HTTPS.
+openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=IP.OF.THE.HOST"
+
 # Install dependent packages.
 uv sync
 
-# Start the backend server.
-uv run --python 3.12 uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
+# Start the backend server (also serves the frontend, PROJECT_ROOT is for serving frontend).
+PROJECT_ROOT=/project/path uv run --python 3.12 uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload --ssl-keyfile key.pem --ssl-certfile cert.pem
 ```
 
-**Frontend:**
+**Frontend (for development with hot-deploy):**
 ```bash
 cd frontend
 pnpm install
