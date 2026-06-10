@@ -165,15 +165,15 @@ Generate a study plan in the following JSON format:
 }}
 
 IMPORTANT: Keep the output concise to avoid truncation.
-- vocabulary: Include ONLY 5 items maximum
-- grammar: Include ONLY 3 items maximum
-- chunks: Include ONLY 2 chunks maximum
+- vocabulary: Include ONLY 3 items maximum (choose the most important ones)
+- grammar: Include ONLY 2 items maximum
+- chunks: Include ONLY 1 chunk maximum (the first/most important one)
 
 CRITICAL REQUIREMENTS:
 1. Every text/string field in the JSON output MUST have a corresponding Chinese translation field with "_zh" suffix. This applies to ALL nested objects including vocabulary items, grammar items, and chunk objects. Do NOT omit any translation fields.
 2. ALL Chinese translations MUST be in TRADITIONAL Chinese (繁體中文) ONLY. Do NOT use Simplified Chinese (簡體中文). Examples: use 學習 not 学习, 詞匯 not 词汇, 影片 not 电影.
 
-Only return the JSON, no other text. Ensure the JSON is complete and valid."""
+Only return the JSON, no other text. Ensure the JSON is complete and valid. The JSON must be properly closed with all strings terminated."""
 
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -318,11 +318,16 @@ Only return the JSON, no other text. Ensure the JSON is complete and valid."""
         without closing quote), finds the last valid JSON boundary and truncates there.
         """
         msg = str(response)
+
+        # Case 1: Odd number of quotes suggests an unclosed string
         quote_count = msg.count('"')
         if quote_count % 2 != 0:
+            # Find the last unclosed quote
             last_quote = msg.rfind('"')
             if last_quote > len(msg) // 2:
+                # Truncate at the unclosed quote
                 truncated = msg[:last_quote]
+                # Try to find a valid JSON end
                 last_brace = truncated.rfind("}") + 1
                 if last_brace > 0:
                     truncated = truncated[:last_brace]
@@ -332,6 +337,30 @@ Only return the JSON, no other text. Ensure the JSON is complete and valid."""
                         return result
                     except json.JSONDecodeError:
                         pass
+
+        # Case 2: Try to find the last complete object (look for },])
+        last_valid_end = msg.rfind("}")
+        if last_valid_end > 0:
+            truncated = msg[:last_valid_end + 1]
+            try:
+                result = json.loads(truncated)
+                logger.info(f"Fixed truncated JSON by truncating at last complete object (char {last_valid_end})")
+                return result
+            except json.JSONDecodeError:
+                pass
+
+        # Case 3: Look for last complete entry in arrays
+        for search_str in [']}}', ']}', '"]', '}]']:
+            last_idx = msg.rfind(search_str)
+            if last_idx > len(msg) // 2:
+                truncated = msg[:last_idx + len(search_str)]
+                try:
+                    result = json.loads(truncated)
+                    logger.info(f"Fixed truncated JSON by truncating at '{search_str}' (char {last_idx})")
+                    return result
+                except json.JSONDecodeError:
+                    pass
+
         return None
 
     def _validate_study_plan(self, plan: dict, video_title: str, video_duration: float) -> dict:

@@ -168,6 +168,12 @@ class VideoService:
                     whisper_transcript,
                 ) = await self._transcribe_video(video, subtitle_paths)
 
+                existing_transcripts = await self.transcript_repo.get_all_by_video_id(video.id)
+                if existing_transcripts:
+                    for et in existing_transcripts:
+                        await self.transcript_repo.delete(et.id)
+                    logger.info(f"Deleted {len(existing_transcripts)} existing transcripts before recreating")
+
                 if youtube_author_transcript:
                     await self.transcript_repo.create(
                         video.id,
@@ -206,6 +212,12 @@ class VideoService:
                 current_stage = "chunking"
                 start = time.perf_counter()
                 await self._update_status(video, "chunking")
+
+                existing_chunks = await self.chunk_repo.get_by_video_id(video.id)
+                if existing_chunks:
+                    await self.chunk_repo.delete_by_video_id(video.id)
+                    logger.info(f"Deleted {len(existing_chunks)} existing chunks before recreating")
+
                 chunks = await self._create_chunks_with_snap(video)
                 await self.chunk_repo.create_many(chunks)
                 timings.chunking_seconds = time.perf_counter() - start
