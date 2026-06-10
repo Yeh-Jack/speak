@@ -58,6 +58,10 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Ignore cancellation errors (happens during navigation/unmount)
+    if (error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+      return Promise.reject(error);
+    }
     console.error('API error:', error.config?.url, error.response?.status, error.message);
     if (error.response?.status === 401) {
       localStorage.removeItem('token');

@@ -135,13 +135,13 @@ function saveWord() {
           </div>
 
           <div class="flex-1 flex flex-col justify-center items-center text-center">
-            <h3 class="text-2xl font-bold text-learning-text-primary mb-1 font-display">
+            <h3 class="text-2xl font-bold text-learning-text-primary mb-2 font-display">
               {{ word }}
             </h3>
-            <p v-if="showZh && wordZh" class="text-lg text-learning-chinese mb-2">
+            <p v-if="showZh && wordZh" class="text-lg text-learning-chinese mb-3">
               {{ wordZh }}
             </p>
-            <p v-if="pronunciation" class="text-sm text-learning-text-secondary mb-4">
+            <p v-if="pronunciation" class="text-sm text-learning-text-secondary mb-6">
               {{ pronunciation }}
             </p>
             <button

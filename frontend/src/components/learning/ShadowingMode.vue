@@ -2,11 +2,13 @@
 import { ref, computed, watch, onUnmounted } from 'vue';
 import BaseButton from '@/components/common/BaseButton.vue';
 import { useI18n } from '@/composables/useI18n';
-import { useVideoStore } from '@/stores';
+import { useVideoStore, useLanguageStore } from '@/stores';
 import videoService from '@/services/video.service';
+import api from '@/services/api';
 
 const { t } = useI18n();
 const videoStore = useVideoStore();
+const languageStore = useLanguageStore();
 
 export interface ShadowingSentence {
   id: string;
@@ -46,6 +48,10 @@ const waveformBars = ref<number[]>(new Array(32).fill(8));
 const recordingError = ref<string>('');
 const micVolume = ref(1.0);
 const speakerVolume = ref(1.0);
+const recordingScore = ref<{ score: number; feedback_en: string; feedback_zh: string; originalText: string; userText: string } | null>(null);
+const isScoring = ref(false);
+const recordingCountdown = ref(0);
+let lastScoredBlob: Blob | null = null;
 
 let mediaRecorder: MediaRecorder | null = null;
 let audioContext: AudioContext | null = null;
@@ -65,6 +71,16 @@ const progress = computed(() => {
 
 const allCompleted = computed(() => {
   return props.sentences.every((s) => userScore.value[s.id] !== undefined);
+});
+
+const scoreFeedback = computed(() => {
+  if (!recordingScore.value) return { en: '', zh: '' };
+  const en = recordingScore.value.feedback_en || '';
+  const zh = recordingScore.value.feedback_zh || '';
+  if (languageStore.showZh) {
+    return { en, zh };
+  }
+  return { en, zh: '' };
 });
 
 function initSpeechRecognition() {
@@ -132,6 +148,11 @@ function calculateSimilarity(str1: string, str2: string): number {
 async function startRecording() {
   recordingError.value = '';
 
+  // Clear old recording data for retry
+  recordedBlob.value = null;
+  recordingScore.value = null;
+  lastScoredBlob = null;
+
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     recordingError.value = t('Recording not supported in this browser', '此瀏覽器不支援錄音');
     return;
@@ -142,105 +163,115 @@ async function startRecording() {
     console.warn('[Shadowing] Recording requires HTTPS');
   }
 
+  // Pre-request microphone BEFORE countdown (eliminates delay)
+  let stream: MediaStream;
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
+    stream = await navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: false,
         noiseSuppression: false,
         autoGainControl: false,
       },
     });
-
-    audioContext = new AudioContext();
-    analyser = audioContext.createAnalyser();
-    analyser.fftSize = 256;
-
-    const source = audioContext.createMediaStreamSource(stream);
-
-    const gainNode = audioContext.createGain();
-    gainNode.gain.value = micVolume.value;
-    source.connect(gainNode);
-    gainNode.connect(analyser);
-
-    const destStream = audioContext.createMediaStreamDestination();
-    gainNode.connect(destStream);
-
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-      ? 'audio/webm;codecs=opus'
-      : MediaRecorder.isTypeSupported('audio/webm')
-        ? 'audio/webm'
-        : 'audio/ogg';
-
-    mediaRecorder = new MediaRecorder(destStream.stream, { mimeType });
-    const chunks: Blob[] = [];
-
-    mediaRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) {
-        chunks.push(e.data);
-      }
-    };
-
-    mediaRecorder.onstop = () => {
-      if (chunks.length === 0) {
-        recordedBlob.value = null;
-        return;
-      }
-      recordedBlob.value = new Blob(chunks, { type: mimeType });
-      stream.getTracks().forEach((track) => track.stop());
-    };
-
-    mediaRecorder.onerror = (e) => {
-      console.error('[Shadowing] MediaRecorder error:', e);
-    };
-
-    mediaRecorder.start(100);
-    isRecording.value = true;
-    showWaveform.value = true;
-
-    if (!speechRecognition) {
-      speechRecognition = initSpeechRecognition();
-    }
-
-    if (speechRecognition) {
-      recognizedText.value = '';
-      speechRecognition.start();
-      isRecognizing.value = true;
-    }
-
-    function updateWaveform() {
-      if (!analyser || !isRecording.value) return;
-
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-      analyser.getByteFrequencyData(dataArray);
-
-      const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-      audioLevel.value = Math.min(average / 128, 1);
-
-      const bars = [];
-      for (let i = 0; i < 32; i++) {
-        const value = dataArray[i] || 0;
-        bars.push(Math.max(8, (value / 255) * 64));
-      }
-      waveformBars.value = bars;
-
-      animationFrame = requestAnimationFrame(updateWaveform);
-    }
-
-    updateWaveform();
-  } catch (error: any) {
-    console.error('Failed to start recording:', error);
-    if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-      recordingError.value = t('Microphone access denied. Please allow microphone permission.', '麥克風權限被拒絕。請允許麥克風權限。');
-    } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
-      recordingError.value = t('No microphone found. Please connect a microphone.', '未找到麥克風。請連接麥克風。');
-    } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
-      recordingError.value = t('Microphone is being used by another application.', '麥克風正在被其他應用程式使用。');
-    } else if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
-      recordingError.value = t('Recording requires HTTPS. Please use HTTPS or localhost.', '錄音需要 HTTPS。請使用 HTTPS 或 localhost。');
-    } else {
-      recordingError.value = t('Failed to start recording. Please try again.', '無法開始錄音。請重試。');
-    }
+  } catch (err) {
+    recordingError.value = t('Microphone access denied', '麥克風訪問被拒絕');
+    return;
   }
+
+  // Start countdown with stream already available
+  recordingCountdown.value = 3;
+
+  const countdownInterval = setInterval(() => {
+    recordingCountdown.value--;
+    if (recordingCountdown.value <= 0) {
+      clearInterval(countdownInterval);
+      beginRecording(stream);
+    }
+  }, 1000);
+}
+
+function beginRecording(stream: MediaStream) {
+  recordingCountdown.value = 0;
+  showWaveform.value = true;
+  isRecording.value = true;
+
+  audioContext = new AudioContext();
+  analyser = audioContext.createAnalyser();
+  analyser.fftSize = 256;
+
+  const source = audioContext.createMediaStreamSource(stream);
+
+  const gainNode = audioContext.createGain();
+  gainNode.gain.value = micVolume.value;
+  source.connect(gainNode);
+  gainNode.connect(analyser);
+
+  const destStream = audioContext.createMediaStreamDestination();
+  gainNode.connect(destStream);
+
+  const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+    ? 'audio/webm;codecs=opus'
+    : MediaRecorder.isTypeSupported('audio/webm')
+      ? 'audio/webm'
+      : 'audio/ogg';
+
+  mediaRecorder = new MediaRecorder(destStream.stream, { mimeType });
+  const chunks: Blob[] = [];
+
+  mediaRecorder.ondataavailable = (e) => {
+    if (e.data.size > 0) {
+      chunks.push(e.data);
+    }
+  };
+
+  mediaRecorder.onstop = () => {
+    if (chunks.length === 0) {
+      recordedBlob.value = null;
+      return;
+    }
+    recordedBlob.value = new Blob(chunks, { type: mimeType });
+    stream.getTracks().forEach((track) => track.stop());
+
+    // Auto-score after recording stops
+    scoreRecording();
+  };
+
+  mediaRecorder.onerror = (e) => {
+    console.error('[Shadowing] MediaRecorder error:', e);
+  };
+
+  mediaRecorder.start(100);
+
+  if (!speechRecognition) {
+    speechRecognition = initSpeechRecognition();
+  }
+
+  if (speechRecognition) {
+    recognizedText.value = '';
+    speechRecognition.start();
+    isRecognizing.value = true;
+  }
+
+  function updateWaveform() {
+    if (!analyser || !isRecording.value) return;
+
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(dataArray);
+
+    const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+    audioLevel.value = Math.min(average / 128, 1);
+
+    const bars = [];
+    for (let i = 0; i < 32; i++) {
+      const value = dataArray[i] || 0;
+      bars.push(Math.max(8, (value / 255) * 64));
+    }
+    waveformBars.value = bars;
+
+    animationFrame = requestAnimationFrame(updateWaveform);
+  }
+
+  updateWaveform();
 }
 
 function stopRecording() {
@@ -450,10 +481,44 @@ function fallbackToTTS(text: string) {
   speechSynthesis.speak(utterance);
 }
 
-function playRecording() {
-  if (!recordedBlob.value) {
-    return;
+async function scoreRecording() {
+  if (!recordedBlob.value || !currentSentence.value) return;
+  if (recordedBlob.value === lastScoredBlob) return;
+
+  isScoring.value = true;
+  recordingScore.value = null;
+
+  try {
+    const formData = new FormData();
+    formData.append('file', recordedBlob.value, 'recording.webm');
+
+    const response = await api.post(
+      `/speaking/videos/${props.videoId}/compare?start=${currentSentence.value.startTime}&end=${currentSentence.value.endTime}&language=en`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+
+    lastScoredBlob = recordedBlob.value;
+    recordingScore.value = {
+      score: response.data.similarity_score,
+      feedback_en: response.data.feedback_en,
+      feedback_zh: response.data.feedback_zh,
+      originalText: response.data.original_text,
+      userText: response.data.user_text,
+    };
+  } catch (err: any) {
+    console.error('[Shadowing] Scoring failed:', err);
+  } finally {
+    isScoring.value = false;
   }
+}
+
+function playRecording() {
+  if (!recordedBlob.value) return;
 
   const url = URL.createObjectURL(recordedBlob.value);
 
@@ -477,6 +542,8 @@ function playRecording() {
 
 function nextSentence() {
   stopCurrentAudio();
+  lastScoredBlob = null;
+  recordingScore.value = null;
   if (currentSentenceIndex.value < props.sentences.length - 1) {
     currentSentenceIndex.value++;
     recordedBlob.value = null;
@@ -488,6 +555,8 @@ function nextSentence() {
 
 function previousSentence() {
   stopCurrentAudio();
+  lastScoredBlob = null;
+  recordingScore.value = null;
   if (currentSentenceIndex.value > 0) {
     currentSentenceIndex.value--;
     recordedBlob.value = null;
@@ -639,6 +708,18 @@ onUnmounted(() => {
           </button>
         </div>
 
+        <div
+          v-if="recordingCountdown > 0"
+          class="flex flex-col items-center justify-center py-4"
+        >
+          <div class="text-5xl font-bold text-learning-accent-primary animate-pulse">
+            {{ recordingCountdown }}
+          </div>
+          <div class="text-sm text-learning-text-secondary mt-2">
+            {{ languageStore.showZh ? '準備說...' : 'Get ready...' }}
+          </div>
+        </div>
+
         <div class="flex items-center justify-center gap-6 my-4">
           <div class="flex items-center gap-2">
             <svg class="w-4 h-4 text-learning-text-secondary" fill="currentColor" viewBox="0 0 24 24">
@@ -711,6 +792,38 @@ onUnmounted(() => {
             </svg>
             {{ userScore[currentSentence.id] }}%
           </span>
+        </div>
+
+        <!-- Dedicated Score Area -->
+        <div
+          v-if="isScoring || recordingScore"
+          class="mt-4 px-4 py-3 bg-learning-bg-primary rounded-lg"
+        >
+          <div v-if="isScoring" class="flex items-center justify-center gap-3">
+            <svg class="w-5 h-5 animate-spin text-learning-accent-secondary" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            <span class="text-sm text-learning-text-secondary">{{ t('Scoring...', '評分中...') }}</span>
+          </div>
+          <div v-else-if="recordingScore" class="flex flex-col gap-2">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl font-bold" :class="{
+                'text-green-400': recordingScore.score >= 80,
+                'text-yellow-400': recordingScore.score >= 60 && recordingScore.score < 80,
+                'text-red-400': recordingScore.score < 60
+              }">
+                {{ Math.round(recordingScore.score * 100) }}%
+              </span>
+              <div class="flex flex-col gap-1">
+              <span v-if="scoreFeedback.en" class="text-sm text-learning-text-secondary">{{ scoreFeedback.en }}</span>
+              <span v-if="languageStore.showZh && scoreFeedback.zh" class="text-sm text-learning-chinese">{{ scoreFeedback.zh }}</span>
+            </div>
+            </div>
+            <div class="text-xs text-learning-text-muted">
+              <span class="text-learning-text-secondary">{{ t('Recognized:', '識別內容：') }}</span> <span class="text-learning-chinese">{{ recordingScore.userText }}</span>
+            </div>
+          </div>
         </div>
       </div>
 

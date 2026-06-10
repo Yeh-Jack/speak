@@ -74,28 +74,36 @@ class TestGenerateFeedback:
         feedback = speaking_service._generate_feedback(
             "hello world", "hello world", 0.85
         )
-        assert "Excellent" in feedback
+        assert "feedback_en" in feedback
+        assert "feedback_zh" in feedback
+        assert "Excellent" in feedback["feedback_en"]
 
     def test_feedback_good(self, speaking_service):
         """Medium-high similarity (>= 0.6, < 0.8) should give good feedback."""
         feedback = speaking_service._generate_feedback(
             "hello world", "hello world test", 0.65
         )
-        assert "Good" in feedback
+        assert "feedback_en" in feedback
+        assert "feedback_zh" in feedback
+        assert "Good" in feedback["feedback_en"]
 
     def test_feedback_nice_try(self, speaking_service):
         """Medium similarity (>= 0.4, < 0.6) should give nice try feedback."""
         feedback = speaking_service._generate_feedback(
             "hello world", "hello", 0.45
         )
-        assert "Nice try" in feedback
+        assert "feedback_en" in feedback
+        assert "feedback_zh" in feedback
+        assert "Nice try" in feedback["feedback_en"]
 
     def test_feedback_keep_practicing(self, speaking_service):
         """Low similarity (< 0.4) should give keep practicing feedback."""
         feedback = speaking_service._generate_feedback(
             "hello world", "foo bar", 0.2
         )
-        assert "Keep practicing" in feedback
+        assert "feedback_en" in feedback
+        assert "feedback_zh" in feedback
+        assert "Keep practicing" in feedback["feedback_en"]
 
 
 class TestSaveRecording:
@@ -201,4 +209,6 @@ class TestCompareRecordings:
             assert result["original_text"] == "hello world test"
             assert result["user_text"] == "hello world test"
             assert result["similarity_score"] == 1.0
-            assert "Excellent" in result["feedback"]
+            assert "feedback_en" in result
+            assert "feedback_zh" in result
+            assert "Excellent" in result["feedback_en"]

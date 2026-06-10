@@ -93,21 +93,6 @@ app.add_middleware(
 app.include_router(api_router, prefix="/api/v1")
 
 
-@app.get("/")
-async def root():
-    """Serve frontend index.html or return API info."""
-    if FRONTEND_DIST.exists():
-        from fastapi.responses import FileResponse
-        index_path = FRONTEND_DIST / "index.html"
-        if index_path.exists():
-            return FileResponse(str(index_path))
-    return {
-        "message": "Welcome to English Learning API",
-        "version": "0.1.0",
-        "docs": "/docs",
-    }
-
-
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
@@ -125,6 +110,36 @@ async def frontend_config(request: Request):
     return Response(content=content, media_type="application/javascript")
 
 
-# Mount frontend static files (if dist exists)
-if FRONTEND_DIST.exists():
-    app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="frontend")
+# SPA fallback handler: serve index.html for client-side routes
+# Serves static files directly if they exist, otherwise returns index.html for SPA routing
+@app.get("/{path:path}", include_in_schema=False)
+async def serve_spa_or_static(path: str, request: Request):
+    """Serve frontend index.html for SPA routes, or static files if they exist."""
+    import os
+
+    # Skip API routes - let them be handled by API router
+    if path.startswith("api/"):
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=404, content={"detail": "Not Found"})
+
+    if FRONTEND_DIST.exists():
+        # Check if the requested path is a file that exists
+        file_path = FRONTEND_DIST / path
+        if file_path.is_file():
+            from starlette.staticfiles import FileResponse
+            return FileResponse(str(file_path))
+
+        # For all other paths (SPA routes), serve index.html
+        index_path = FRONTEND_DIST / "index.html"
+        if index_path.exists():
+            from fastapi.responses import FileResponse
+            return FileResponse(str(index_path))
+
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=404, content={"detail": "Not Found"})
+
+
+# Mount frontend static files (if dist exists) - but catch-all above handles all paths first
+# Actually, we don't need this anymore since the catch-all handles everything
+# if FRONTEND_DIST.exists():
+#     app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="frontend")

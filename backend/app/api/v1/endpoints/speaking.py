@@ -110,6 +110,7 @@ async def compare_recording(
     start: float,
     end: float,
     file: UploadFile = File(...),
+    language: str = "en",
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Compare user's recording with original audio.
@@ -119,9 +120,10 @@ async def compare_recording(
         start: Segment start time
         end: Segment end time
         file: User's audio recording (WebM format)
+        language: Whisper language code (always 'en' for English videos)
 
     Returns:
-        Comparison result with similarity score and feedback
+        Comparison result with similarity score and feedback (English + Chinese)
     """
     video_repo = VideoRepository(db)
     video = await video_repo.get_by_id(video_id)
@@ -147,7 +149,7 @@ async def compare_recording(
 
     try:
         result = await speaking_service.compare_recordings(
-            original_audio_path, user_audio_path
+            original_audio_path, user_audio_path, language
         )
         return {
             "video_id": str(video_id),
