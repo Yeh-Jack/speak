@@ -15,12 +15,6 @@ class VocabularyBase(BaseModel):
     cefr_level: str | None = Field(None, max_length=10)
 
 
-class VocabularyCreate(VocabularyBase):
-    """Schema for creating vocabulary."""
-
-    pass
-
-
 class VocabularyUpdate(BaseModel):
     """Schema for updating vocabulary."""
 

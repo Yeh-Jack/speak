@@ -12,6 +12,7 @@ export default {
             primary: '#1a1a2e',
             secondary: '#16213e',
             tertiary: '#0f3460',
+            expanded: '#3a2a20',
           },
           accent: {
             primary: '#e94560',
@@ -27,7 +28,7 @@ export default {
           'chinese-muted': '#b8860b',
           surface: {
             DEFAULT: '#16213e',
-            hover: '#1a2744',
+            hover: '#483428',
             active: '#0f3460',
           },
           success: '#10b981',

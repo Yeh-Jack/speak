@@ -2,8 +2,11 @@
 import { ref, computed, watch, onUnmounted } from 'vue';
 import BaseButton from '@/components/common/BaseButton.vue';
 import { useI18n } from '@/composables/useI18n';
+import { useVideoStore } from '@/stores';
+import videoService from '@/services/video.service';
 
 const { t } = useI18n();
+const videoStore = useVideoStore();
 
 export interface ShadowingSentence {
   id: string;
@@ -11,10 +14,12 @@ export interface ShadowingSentence {
   startTime: number;
   endTime: number;
   translation?: string;
+  chunkIndex: number;
 }
 
 interface Props {
   sentences: ShadowingSentence[];
+  videoId: string;
   isActive?: boolean;
 }
 
@@ -45,6 +50,9 @@ let audioContext: AudioContext | null = null;
 let analyser: AnalyserNode | null = null;
 let animationFrame: number | null = null;
 let speechRecognition: any = null;
+let currentAudio: HTMLAudioElement | null = null;
+let stopInterval: ReturnType<typeof setInterval> | null = null;
+let intervalStarted = false;
 
 const currentSentence = computed(() => props.sentences[currentSentenceIndex.value]);
 
@@ -228,12 +236,164 @@ function stopRecording() {
 async function playOriginal() {
   if (!currentSentence.value) return;
 
-  const utterance = new SpeechSynthesisUtterance(currentSentence.value.text);
+  stopCurrentAudio();
+  isPlayingPractice.value = true;
+
+  const sentence = currentSentence.value;
+  const chunk = videoStore.chunks[sentence.chunkIndex];
+  
+  if (!chunk) {
+    console.error('Chunk not found for index:', sentence.chunkIndex);
+    fallbackToTTS(sentence.text);
+    return;
+  }
+
+  try {
+    const audioUrl = await videoService.getAudioUrl(props.videoId, sentence.chunkIndex);
+    const audio = new Audio(audioUrl);
+    currentAudio = audio;
+    audio.playbackRate = 0.8;
+
+    const startOffset = Math.max(0, sentence.startTime - chunk.start_time);
+    const targetEndOffset = sentence.endTime - chunk.start_time;
+
+    audio.onloadedmetadata = () => {
+      if (currentAudio !== audio) return;
+
+      const audioDuration = audio.duration;
+      if (!isFinite(audioDuration) || audioDuration <= 0) {
+        console.error('Invalid audio duration:', audioDuration);
+        if (currentAudio === audio) {
+          currentAudio = null;
+          fallbackToTTS(sentence.text);
+        }
+        return;
+      }
+
+      const endOffset = Math.min(audioDuration, targetEndOffset);
+
+      if (endOffset <= startOffset) {
+        if (currentAudio === audio) {
+          currentAudio = null;
+          fallbackToTTS(sentence.text);
+        }
+        return;
+      }
+
+      const onceHandler = () => {
+        if (currentAudio !== audio) return;
+        audio.currentTime = startOffset;
+        
+        audio.onplaying = () => {
+          if (currentAudio !== audio || intervalStarted) return;
+          
+          intervalStarted = true;
+          if (stopInterval) clearInterval(stopInterval);
+          
+          stopInterval = setInterval(() => {
+            if (currentAudio !== audio) {
+              if (stopInterval) {
+                clearInterval(stopInterval);
+                stopInterval = null;
+              }
+              intervalStarted = false;
+              return;
+            }
+            
+            if (audio.currentTime >= endOffset) {
+              if (stopInterval) {
+                clearInterval(stopInterval);
+                stopInterval = null;
+              }
+              intervalStarted = false;
+              audio.pause();
+              audio.dispatchEvent(new Event('ended'));
+            }
+          }, 100);
+        };
+
+        audio.onended = () => {
+          if (stopInterval) {
+            clearInterval(stopInterval);
+            stopInterval = null;
+          }
+          intervalStarted = false;
+          if (currentAudio === audio) {
+            isPlayingPractice.value = false;
+            currentAudio = null;
+          }
+          URL.revokeObjectURL(audio.src);
+        };
+
+        audio.onerror = (e) => {
+        if (stopInterval) {
+          clearInterval(stopInterval);
+          stopInterval = null;
+        }
+        intervalStarted = false;
+        if (currentAudio === audio) {
+          currentAudio = null;
+          fallbackToTTS(sentence.text);
+        }
+      };
+
+      audio.play().catch(() => {
+        if (currentAudio === audio) {
+          currentAudio = null;
+          fallbackToTTS(sentence.text);
+        }
+      });
+      };
+
+      audio.addEventListener('canplay', onceHandler, { once: true });
+    };
+
+    audio.onerror = (e) => {
+      console.error('Audio load error:', e);
+      if (currentAudio === audio) {
+        currentAudio = null;
+        fallbackToTTS(sentence.text);
+      }
+    };
+
+    audio.load();
+  } catch (err) {
+    console.error('playOriginal error:', err);
+    currentAudio = null;
+    isPlayingPractice.value = false;
+    fallbackToTTS(sentence.text);
+  }
+}
+
+function stopCurrentAudio() {
+  if (stopInterval) {
+    clearInterval(stopInterval);
+    stopInterval = null;
+  }
+  intervalStarted = false;
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio.onended = null;
+    currentAudio.ontimeupdate = null;
+    currentAudio.onloadedmetadata = null;
+    currentAudio.oncanplay = null;
+    currentAudio.onplaying = null;
+    currentAudio.onerror = null;
+    currentAudio = null;
+  }
+}
+
+function fallbackToTTS(text: string) {
+  isPlayingPractice.value = false;
+  const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'en-US';
   utterance.rate = 0.8;
 
-  isPlayingPractice.value = true;
   utterance.onend = () => {
+    isPlayingPractice.value = false;
+  };
+
+  utterance.onerror = () => {
     isPlayingPractice.value = false;
   };
 
@@ -253,6 +413,7 @@ function playRecording() {
 }
 
 function nextSentence() {
+  stopCurrentAudio();
   if (currentSentenceIndex.value < props.sentences.length - 1) {
     currentSentenceIndex.value++;
     recordedBlob.value = null;
@@ -263,6 +424,7 @@ function nextSentence() {
 }
 
 function previousSentence() {
+  stopCurrentAudio();
   if (currentSentenceIndex.value > 0) {
     currentSentenceIndex.value--;
     recordedBlob.value = null;
@@ -271,6 +433,7 @@ function previousSentence() {
 }
 
 function restartPractice() {
+  stopCurrentAudio();
   currentSentenceIndex.value = 0;
   recordedBlob.value = null;
   userScore.value = {};
@@ -282,6 +445,7 @@ watch(() => props.isActive, (active) => {
     isRecording.value = false;
     showWaveform.value = false;
     recordedBlob.value = null;
+    stopCurrentAudio();
     if (speechRecognition && isRecognizing.value) {
       speechRecognition.stop();
     }
@@ -302,11 +466,12 @@ onUnmounted(() => {
     speechRecognition.stop();
   }
   speechSynthesis.cancel();
+  stopCurrentAudio();
 });
 </script>
 
 <template>
-  <div class="bg-learning-surface rounded-xl border border-learning-bg-tertiary overflow-hidden">
+  <div class="bg-learning-bg-expanded rounded-xl border border-learning-bg-tertiary overflow-hidden">
     <div class="p-5 border-b border-learning-bg-tertiary">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-lg font-semibold font-display text-learning-text-primary flex items-center gap-2">
@@ -413,8 +578,9 @@ onUnmounted(() => {
 
         <div class="flex items-center justify-center gap-4">
           <button
+            v-spray
             @click="playOriginal"
-            class="flex items-center gap-2 px-4 py-2 bg-learning-bg-primary hover:bg-learning-bg-secondary text-learning-text-primary rounded-lg transition-colors"
+            class="flex items-center gap-2 px-4 py-2 bg-learning-bg-primary text-learning-text-primary rounded-lg transition-colors"
           >
             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
               <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z" />

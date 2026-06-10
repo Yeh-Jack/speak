@@ -1,5 +1,6 @@
 """Vocabulary endpoints for spaced repetition learning."""
 
+from datetime import date, timedelta
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -104,11 +105,9 @@ async def review_vocabulary(
 
         if quality < 3:
             vocab.review_count = 0
-            from datetime import date, timedelta
             vocab.next_review = date.today() + timedelta(days=1)
         else:
             vocab.review_count += 1
-            from datetime import date, timedelta
             intervals = [1, 3, 7, 14, 30, 60]
             interval_days = intervals[min(vocab.review_count, len(intervals) - 1)]
             vocab.next_review = date.today() + timedelta(days=interval_days)

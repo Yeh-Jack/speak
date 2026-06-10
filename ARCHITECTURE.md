@@ -42,7 +42,7 @@
 └────────────────────────────────────┬────────────────────────────────────┘
                                      │ REST API (Async)
 ┌────────────────────────────────────┴────────────────────────────────────┐
-│                         BACKEND (FastAPI + Python 3.13+)                │
+│                         BACKEND (FastAPI + Python 3.12)                │
 │                                                                         │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                      SERVICE LAYER (Async I/O)                  │   │
@@ -92,7 +92,7 @@
 | **Frontend** | UI Components | Vue 3.5 + TypeScript | User interaction, video playback |
 | **Frontend** | State Management | Pinia | Client-side state |
 | **API** | REST Endpoints | FastAPI | HTTP interface |
-| **Service** | Business Logic | Python 3.13+ | Processing pipeline |
+| **Service** | Business Logic | Python 3.12 | Processing pipeline |
 | **Repository** | Data Access | SQLAlchemy 2.0 | Database operations |
 | **LLM** | AI Processing | llama-cpp-python | Study plan generation, chat |
 | **Storage** | File System | Local disk | Video, audio, transcript files |

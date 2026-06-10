@@ -51,16 +51,24 @@ async def test_transcription_service_youtube_strategy_first(transcription_servic
     video_path.touch()
 
     mock_transcript = [{"start": 0.0, "end": 5.0, "text": "Test sentence.", "speaker": None}]
+    mock_whisper_transcript = [{"start": 0.0, "end": 5.0, "text": "Whisper sentence.", "speaker": None}]
 
     with patch.object(
-        transcription_service, "_try_youtube_subtitles", new_callable=AsyncMock
+        transcription_service, "get_youtube_transcript", new_callable=AsyncMock
     ) as mock_yt:
         mock_yt.return_value = mock_transcript
 
-        result = await transcription_service.transcribe(video_path)
+        with patch.object(
+            transcription_service, "transcribe_with_whisper", new_callable=AsyncMock
+        ) as mock_whisper:
+            mock_whisper.return_value = mock_whisper_transcript
 
-        assert result == mock_transcript
-        mock_yt.assert_called_once()
+            result = await transcription_service.get_dual_transcripts(video_path)
+
+            assert result[0] == mock_transcript
+            assert result[2] == mock_whisper_transcript
+            mock_yt.assert_called_once()
+            mock_whisper.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -74,18 +82,18 @@ async def test_transcription_service_fallback_to_whisper(transcription_service, 
     ]
 
     with patch.object(
-        transcription_service, "_try_youtube_subtitles", new_callable=AsyncMock
+        transcription_service, "get_youtube_transcript", new_callable=AsyncMock
     ) as mock_yt:
         mock_yt.return_value = None
 
         with patch.object(
-            transcription_service, "_transcribe_with_whisper", new_callable=AsyncMock
+            transcription_service, "transcribe_with_whisper", new_callable=AsyncMock
         ) as mock_whisper:
             mock_whisper.return_value = mock_transcript
 
-            result = await transcription_service.transcribe(video_path)
+            result = await transcription_service.get_dual_transcripts(video_path)
 
-            assert result == mock_transcript
+            assert result[2] == mock_transcript
             mock_whisper.assert_called_once()
 
 
@@ -98,16 +106,16 @@ async def test_transcription_service_raises_error_on_complete_failure(
     video_path.touch()
 
     with patch.object(
-        transcription_service, "_try_youtube_subtitles", new_callable=AsyncMock
+        transcription_service, "get_youtube_transcript", new_callable=AsyncMock
     ) as mock_yt:
         mock_yt.return_value = None
 
         with patch.object(
-            transcription_service, "_transcribe_with_whisper", new_callable=AsyncMock
+            transcription_service, "transcribe_with_whisper", new_callable=AsyncMock
         ) as mock_whisper:
-            mock_whisper.side_effect = Exception("Whisper failed")
+            mock_whisper.side_effect = TranscriptionError("Whisper failed")
 
             with pytest.raises(TranscriptionError) as exc_info:
-                await transcription_service.transcribe(video_path)
+                await transcription_service.get_dual_transcripts(video_path)
 
-            assert "Failed to transcribe video" in str(exc_info.value)
+            assert "Whisper failed" in str(exc_info.value)

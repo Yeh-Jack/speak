@@ -9,4 +9,10 @@ const app = createApp(App);
 app.use(createPinia());
 app.use(router);
 
+app.directive('spray', {
+  mounted(el) {
+    el.classList.add('hover-fade');
+  }
+});
+
 app.mount('#app');

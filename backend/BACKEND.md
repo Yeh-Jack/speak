@@ -1,334 +1,147 @@
-# English Learning App - Backend Summary
-
-## Table of Contents
-
-1. [System Overview](#system-overview)
-2. [Architecture](#architecture)
-3. [Directory Structure](#directory-structure)
-4. [Database Schema](#database-schema)
-5. [API Reference](#api-reference)
-6. [Services Layer](#services-layer)
-7. [Processing Pipeline](#processing-pipeline)
-8. [Configuration](#configuration)
-9. [Storage Structure](#storage-structure)
-10. [GPU Configuration](#gpu-configuration)
-11. [Dependencies](#dependencies)
-
----
+# Backend Documentation
 
 ## System Overview
 
-**English Learning App** is an AI-powered English learning platform using LLM as a personalized teacher. Users provide YouTube URLs and the system generates personalized study plans and vocabulary lists.
+AI-powered English learning platform. Users provide YouTube URLs and the system generates study plans with vocabulary and grammar.
 
 | Component | Technology |
 |-----------|------------|
-| Backend | FastAPI + Python 3.13+ + uv |
+| Framework | FastAPI + Python 3.12 + uv |
 | Database | SQLite3 (learning.db) |
 | LLM | llama-cpp-python (Qwen3.5-2B-Q4_K_M) |
 | Video | FFmpeg + yt-dlp |
 | Transcription | faster-whisper |
 
-**Key Design Decisions:**
-- Single-user application (no authentication)
+**Design:**
+- Single-user (no authentication)
 - YouTube only (no local uploads)
-- Single fixed LLM model (no switching)
-- All operations use async/await (no background queues)
-- **Traditional Chinese (繁體中文)** for all Chinese text
+- Fixed LLM model (no switching)
+- All async/await (no background queues)
+- Traditional Chinese (繁體中文) for all Chinese text
 
 ---
 
-## Architecture
-
-```
-Frontend (Vue 3.5 + TypeScript)
-         ↓ REST API
-Backend (FastAPI) - Async I/O operations
-         ↓
-Services: Video | Transcription | LLM | Download | Chunking
-         ↓
-SQLite3 | llama-cpp-python (in-backend)
-```
-
-### Backend Structure
+## Directory Structure
 
 ```
 backend/
 ├── app/
-│   ├── main.py                   # FastAPI entry point
-│   ├── config.py                 # Configuration (Pydantic settings)
-│   ├── logging.py                # Logging setup
-│   │
+│   ├── main.py                    # FastAPI entry, CORS, lifespan
 │   ├── api/v1/
-│   │   ├── router.py             # API router
+│   │   ├── router.py              # Route aggregation
 │   │   └── endpoints/
-│   │       ├── videos.py         # Video endpoints
-│   │       ├── courses.py        # Course endpoints
-│   │       ├── chat.py           # Chat/AI tutor endpoints
-│   │       └── ...
-│   │
-│   ├── core/                     # Core functionality
-│   │   ├── config.py             # Settings, DATA_DIR, paths
+│   │       ├── videos.py          # Video CRUD + YouTube processing
+│   │       ├── chat.py            # AI tutor streaming (SSE)
+│   │       ├── speaking.py        # Speaking practice
+│   │       ├── stats.py           # Dashboard statistics
+│   │       ├── llm.py             # GPU/LLM health status
+│   │       ├── vocabulary.py      # Vocabulary + SM-2 spaced repetition
+│   │       └── migrate.py         # Vocabulary migration tool
+│   ├── core/
+│   │   ├── config.py              # Settings, paths (DATA_DIR, DATABASE_URL)
 │   │   └── logging.py            # Structured logging
-│   │
-│   ├── db/                       # Database layer
-│   │   ├── base.py               # Base model class
-│   │   ├── session.py            # Async session
-│   │   └── init_db.py            # DB initialization
-│   │
+│   ├── db/
+│   │   ├── base.py                # SQLAlchemy Base + TimestampMixin
+│   │   └── session.py             # AsyncSession with SQLite pragmas
 │   ├── models/                   # SQLAlchemy models
-│   │   ├── video.py              # Video model
-│   │   ├── chunk.py              # VideoChunk model
-│   │   ├── transcript.py         # Transcript model
-│   │   ├── study_plan.py         # StudyPlan model
-│   │   └── vocabulary.py         # Vocabulary model
-│   │
-│   ├── schemas/                  # Pydantic schemas
-│   │   ├── video.py
-│   │   ├── transcript.py
-│   │   ├── chat.py
-│   │   └── ...
-│   │
-│   ├── repositories/             # Data access layer
-│   │   ├── video.py
-│   │   ├── chunk.py
-│   │   └── ...
-│   │
-│   ├── services/                 # Business logic
-│   │   ├── video_service.py      # Orchestrator with state machine
-│   │   ├── download_service.py   # YouTube download (yt-dlp)
-│   │   ├── chunking_service.py   # Hybrid Dynamic sentence-snap
-│   │   ├── transcription_service.py # YouTube subs + Whisper
-│   │   ├── llm_service.py        # llama-cpp-python integration
-│   │   ├── chat_service.py       # AI tutor chat service
-│   │   └── exceptions.py         # Custom exceptions
-│   │
+│   ├── schemas/                   # Pydantic v2 schemas
+│   ├── repositories/             # Data access layer (async)
+│   ├── services/                  # Business logic (async)
 │   └── utils/
-│       └── gpu_utils.py          # GPU detection & configuration
-│
+│       └── gpu_utils.py          # NVIDIA GPU detection
 ├── alembic/                      # Database migrations
-├── tests/                        # Test suite
-└── pyproject.toml                # Project config (uv)
+└── pyproject.toml                # uv project config
 ```
 
 ---
 
-## Database Schema
+## API Endpoints
 
-### Videos Table
-```sql
-CREATE TABLE videos (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    title VARCHAR(500) NOT NULL,
-    description TEXT,
-    source_type VARCHAR(50) DEFAULT 'youtube',
-    youtube_url VARCHAR(1000) NOT NULL,
-    file_path VARCHAR(1000),           -- Downloaded file path
-    duration FLOAT NOT NULL,           -- Video duration in seconds
-    chunk_duration FLOAT DEFAULT 300,  -- Target chunk duration (5 min)
-    status VARCHAR(50) DEFAULT 'pending',
-    error_message TEXT,                -- Checkpoint-resume error tracking
-    thumbnail VARCHAR(500),
-    uploader VARCHAR(500),
-    upload_date VARCHAR(20),           -- YYYYMMDD format
-    view_count INTEGER,
-    like_count INTEGER,
-    metadata_json JSON,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
-```
+### Videos (`/api/v1/videos`)
 
-### Video Chunks Table
-```sql
-CREATE TABLE video_chunks (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    video_id UUID REFERENCES videos(id) ON DELETE CASCADE,
-    chunk_index INTEGER NOT NULL,      -- Sequential: 0, 1, 2...
-    start_time FLOAT NOT NULL,         -- Seconds
-    end_time FLOAT NOT NULL,           -- Seconds
-    duration FLOAT NOT NULL,
-    transcript JSONB,
-    status VARCHAR(50) DEFAULT 'pending',
-    created_at TIMESTAMP DEFAULT NOW(),
-    UNIQUE(video_id, chunk_index)
-);
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/` | List all videos |
+| `GET` | `/{id}` | Get video by ID |
+| `POST` | `/youtube` | Create video from YouTube URL |
+| `POST` | `/info` | Get video metadata (no DB) |
+| `PATCH` | `/{id}` | Update video |
+| `DELETE` | `/{id}` | Delete video |
+| `POST` | `/{id}/retry` | Retry from checkpoint |
+| `GET` | `/{id}/chunks` | Get video chunks |
+| `GET` | `/{id}/chunks/{idx}/audio` | Get chunk audio (MP3) |
+| `GET` | `/{id}/stream` | Stream video file |
+| `GET` | `/{id}/transcripts/{type}` | Get transcript (user/youtube_author/whisper/youtube_auto) |
+| `POST` | `/{id}/transcripts/user` | Upload user transcript |
+| `GET` | `/{id}/study-plans` | Get study plans |
+| `GET/PATCH` | `/{id}/study-plans/{idx}` | Get/update study plan |
+| `GET/PATCH` | `/{id}/progress` | Get/update study progress |
 
-### Transcripts Table
-```sql
-CREATE TABLE transcripts (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    video_id UUID REFERENCES videos(id) ON DELETE CASCADE,
-    source VARCHAR(50) NOT NULL,        -- user, youtube_author, whisper, youtube_auto
-    language VARCHAR(10) DEFAULT 'en',
-    segments JSONB NOT NULL,            -- [{start, end, text}]
-    created_at TIMESTAMP DEFAULT NOW()
-);
-```
+### Other Endpoints
 
-### Study Plans Table
-```sql
-CREATE TABLE study_plans (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    video_id UUID REFERENCES videos(id) ON DELETE CASCADE,
-    data JSONB NOT NULL,                -- LLM-generated study plan
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/chat` | Streaming AI tutor (SSE) |
+| `GET` | `/api/v1/stats/dashboard` | Dashboard statistics |
+| `GET` | `/api/v1/llm/gpu-status` | GPU detection status |
+| `GET` | `/api/v1/llm/llm-health` | LLM health check |
+| `GET` | `/api/v1/vocabulary/reviewed` | Reviewed vocabulary words |
+| `GET` | `/api/v1/vocabulary/favorites` | Favorite words |
+| `POST` | `/api/v1/vocabulary/favorites/{word}/toggle` | Toggle favorite |
+| `GET` | `/api/v1/vocabulary/{word}` | Get vocabulary item |
+| `POST` | `/api/v1/vocabulary/{word}/review` | Review with SM-2 |
+| `GET` | `/api/v1/speaking/videos/{id}/segments` | Get speaking segments |
+| `GET` | `/api/v1/speaking/videos/{id}/audio-segment` | Extract audio segment |
+| `POST` | `/api/v1/speaking/videos/{id}/compare` | Compare recording |
 
 ---
 
-## API Reference
+## Database Models
 
-### Video Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/v1/videos` | List all videos |
-| `GET` | `/api/v1/videos/{id}` | Get video by ID |
-| `POST` | `/api/v1/videos/youtube` | Create video from YouTube URL |
-| `POST` | `/api/v1/videos/info` | Get video metadata without DB operations |
-| `PATCH` | `/api/v1/videos/{id}` | Update video |
-| `DELETE` | `/api/v1/videos/{id}` | Delete video |
-| `POST` | `/api/v1/videos/{id}/retry` | Retry processing from checkpoint |
-| `GET` | `/api/v1/videos/{id}/chunks` | Get video chunks |
-| `GET` | `/api/v1/videos/{id}/chunks/{index}/audio` | Get chunk audio (MP3) |
-| `GET` | `/api/v1/videos/{id}/transcripts/{type}` | Get transcript by type |
-| `POST` | `/api/v1/videos/{id}/transcripts/user` | Upload user transcript |
-
-### Transcript Types (Priority Order)
-1. **user** - User-uploaded subtitles (highest)
-2. **youtube_author** - YouTube creator-uploaded subtitles
-3. **whisper** - Whisper transcription (always generated)
-4. **youtube_auto** - YouTube auto-generated captions (lowest)
-
-### Course Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/v1/courses` | List courses |
-| `POST` | `/api/v1/courses` | Create course |
-| `GET` | `/api/v1/courses/{id}` | Get course |
-| `PATCH` | `/api/v1/courses/{id}` | Update course |
-| `DELETE` | `/api/v1/courses/{id}` | Delete course |
-| `POST` | `/api/v1/courses/{id}/videos` | Add video to course |
-| `PUT` | `/api/v1/courses/{id}/videos/reorder` | Reorder videos |
-| `POST` | `/api/v1/courses/{id}/start` | Start learning course |
-
-### Chat Endpoints (AI Tutor)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/v1/chat` | Streaming chat (SSE) |
-
-**Request:**
-```json
-{
-    "video_id": "uuid (optional)",
-    "messages": [{"role": "user", "content": "..."}],
-    "system_prompt": "optional override"
-}
+### Video
+```sql
+videos (id, title, description, source_type, youtube_url, file_path,
+        duration, chunk_duration, status, error_message, thumbnail,
+        uploader, upload_date, view_count, like_count, metadata_json)
 ```
 
-**Streaming Response (SSE):**
-```
-data: {"token": "Hello", "done": false}\n\n
-data: {"token": " world", "done": false}\n\n
-...
-data: {"token": "", "done": true}\n\n
+### VideoChunk
+```sql
+video_chunks (id, video_id, chunk_index, start_time, end_time,
+              duration, transcript, status)
 ```
 
-**Error Format:**
+### Transcript
+```sql
+transcripts (id, video_id, source, segments, full_text, language)
 ```
-data: {"error": "error message"}\n\n
-```
+Sources: `user`, `youtube_author`, `whisper`, `youtube_auto`
 
----
-
-## Services Layer
-
-### VideoService (Orchestrator)
-Located: `app/services/video_service.py`
-
-Implements state machine with checkpoint-resume:
-
-```
-pending → downloading → downloading_complete →
-transcribing → transcribing_complete →
-chunking → chunking_complete →
-audio_extracted → studying → ready
-                                    ↓
-                                  failed
+### StudyPlan
+```sql
+study_plans (id, video_id, chunk_index, objectives, vocabulary,
+             grammar, notes, notes_zh, overall_difficulty, estimated_time)
 ```
 
-Key methods:
-- `process_video(video_id)` - Full pipeline
-- `retry_video(video_id)` - Resume from checkpoint
-- `get_transcript_by_priority(video_id)` - Get highest priority transcript
+### Vocabulary (SM-2)
+```sql
+vocabularies (id, word, definition, context, cefr_level, pronunciation,
+              review_count, next_review, interval, ease_factor,
+              repetition_number, is_favorite)
+```
 
-### DownloadService
-Located: `app/services/download_service.py`
+### StudyProgress
+```sql
+study_progress (id, video_id, chunk_index, current_timestamp,
+                sentence_index, completed, next_review)
+```
 
-- Uses **yt-dlp** for YouTube downloads
-- Downloads video as WebM format
-- Downloads author and auto-generated subtitles (json3, vtt, srt, ass, lrc)
-- Falls back to Whisper if subtitle download fails
-
-### ChunkingService
-Located: `app/services/chunking_service.py`
-
-**Hybrid Dynamic Sentence-Snap Algorithm:**
-1. Calculate ideal 5-min positions: (0:00-5:00), (5:00-10:00), etc.
-2. For each ideal boundary, search ±30s for sentence-ending punctuation (`.! ?`)
-3. Snap to nearest sentence boundary if found, otherwise use ideal position
-
-### TranscriptionService
-Located: `app/services/transcription_service.py`
-
-**Triple Transcript System:**
-1. **YouTube subtitles** - From downloaded subtitle files
-2. **YouTube auto captions** - ASR-generated captions
-3. **Whisper** - Always runs, regardless of YouTube subtitle availability
-
-Uses:
-- `pysubs2` for parsing SRT/VTT/ASS/SSA
-- `faster-whisper` (base model) for transcription
-- FFmpeg for audio extraction (16kHz, mono, WAV)
-
-### LLMService
-Located: `app/services/llm_service.py`
-
-- Uses **llama-cpp-python** with **Qwen3.5-2B-Q4_K_M**
-- Lazy-loaded model initialization
-- Generates structured JSON study plans
-- All Chinese text must be Traditional Chinese (繁體中文)
-- **Context Size**: 8192 tokens (LLM_CONTEXT_SIZE)
-- **Transcript Truncation**: 4000 characters (first portion only)
-
-**Video Length Limitation:**
-- With 4000 character transcript limit and ~1000 chars/minute transcript density
-- **Estimated limit: ~3-5 minutes** of video content per study plan
-- Longer videos: Only the first ~3-5 minutes are used for study plan generation
-- For full video coverage, consider future chunked study plan approach
-
-**Streaming Support:**
-- `stream_response(messages)` - Yields tokens one at a time for real-time UI
-
-### ChatService
-Located: `app/services/chat_service.py`
-
-AI tutor service for conversational learning with streaming support:
-
-- **Streaming**: `stream_chat(messages)` - Yields tokens via SSE
-
-**Features:**
-- Optional video context from Whisper transcript (first 100 segments)
-- Customizable system prompt via `system_prompt` parameter
-- Lazy-loaded llama-cpp-python model (shared with LLMService in single-user mode)
-
-**System Prompt (default):**
-Acts as an expert English tutor helping students learn from video content, answering vocabulary/grammar questions, explaining idioms, and providing practice suggestions.
+### SpeakingPracticeRecord
+```sql
+speaking_practice_records (id, video_id, segment_start, segment_end,
+                           character_text, user_recording_path,
+                           similarity_score, feedback, attempts)
+```
 
 ---
 
@@ -337,80 +150,85 @@ Acts as an expert English tutor helping students learn from video content, answe
 ```
 POST /api/v1/videos/youtube
          ↓
-┌─────────────────────────────────────────────────────────────┐
-│ 1. Download (yt-dlp)                                       │
-│    - Downloads video + subtitles                           │
-│    - Stores in data/videos/{id}.webm                      │
-│    - Status: pending → downloading → downloading_complete  │
-└─────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────┐
+│ 1. Download (yt-dlp)                    │
+│    pending → downloading →             │
+│    downloading_complete                │
+└────────────────────────────────────────┘
          ↓
-┌─────────────────────────────────────────────────────────────┐
-│ 2. Transcribe (Whisper - always runs)                      │
-│    - Extracts audio (FFmpeg → WAV 16kHz mono)              │
-│    - Transcribes with faster-whisper                       │
-│    - Stores all available transcripts                      │
-│    - Status: downloading_complete → transcribing →         │
-│      transcribing_complete                                 │
-└─────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────┐
+│ 2. Transcribe (always runs Whisper)    │
+│    downloading_complete → transcribing │
+│    → transcribing_complete             │
+└────────────────────────────────────────┘
          ↓
-┌─────────────────────────────────────────────────────────────┐
-│ 3. Chunk (Hybrid Dynamic + Sentence Snap)                  │
-│    - Uses transcript for sentence-aware boundaries        │
-│    - Creates virtual chunks (timestamps only)              │
-│    - Status: transcribing_complete → chunking →            │
-│      chunking_complete                                     │
-└─────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────┐
+│ 3. Chunk (Hybrid Dynamic sentence-snap)│
+│    transcribing_complete → chunking →  │
+│    chunking_complete                   │
+└────────────────────────────────────────┘
          ↓
-┌─────────────────────────────────────────────────────────────┐
-│ 4. Extract Audio                                            │
-│    - Extracts MP3 for each chunk                           │
-│    - Stores in data/audios/{video_id}/chunk_{i}.mp3        │
-│    - Status: chunking_complete → audio_extracted           │
-└─────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────┐
+│ 4. Extract Audio (per chunk MP3)       │
+│    chunking_complete → extracting_audio│
+│    → audio_extracted                   │
+└────────────────────────────────────────┘
          ↓
-┌─────────────────────────────────────────────────────────────┐
-│ 5. Generate Study Plan (LLM)                               │
-│    - Uses highest priority transcript                      │
-│    - LLM generates vocabulary, grammar, notes              │
-│    - Status: audio_extracted → studying → ready           │
-└─────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────┐
+│ 5. Generate Study Plan (LLM)            │
+│    audio_extracted → studying → ready  │
+└────────────────────────────────────────┘
          ↓
-   Returns complete VideoResponse
+   Returns VideoResponse
 ```
 
-### Checkpoint-Resume
-On failure:
-- Video stays in last successful state
-- `error_message` field set with failure details
-- User can retry via `POST /api/v1/videos/{id}/retry`
+**On failure:** Video stays at last successful state with `error_message`. Retry via `POST /{id}/retry`.
+
+---
+
+## Transcript Priority
+
+1. `user` - User-uploaded (highest)
+2. `youtube_author` - Creator-uploaded
+3. `whisper` - Whisper transcription (always generated)
+4. `youtube_auto` - YouTube auto-generated (lowest)
+
+---
+
+## Services
+
+| Service | Purpose |
+|---------|---------|
+| VideoService | Orchestrator with state machine |
+| DownloadService | yt-dlp YouTube download |
+| ChunkingService | Hybrid Dynamic sentence-snap (±30s) |
+| TranscriptionService | YouTube subs + Whisper (dual) |
+| LLMService | llama-cpp-python Qwen3.5-2B |
+| ChatService | AI tutor streaming chat |
+| SpeakingService | Audio comparison |
+| StatsService | Dashboard calculations |
 
 ---
 
 ## Configuration
 
-### Fixed System Constants (Not Configurable)
+### Fixed (not configurable)
 ```python
-PROJECT_ROOT = /app  # Docker) or calculated (local)
+PROJECT_ROOT = /app (Docker) or detected
 DATA_DIR = PROJECT_ROOT / "data"
-DATABASE_URL = f"sqlite+aiosqlite:///{DATA_DIR}/db/learning.db"
-LLM_MODEL_PATH = DATA_DIR / "models"
-SENTENCE_SNAP = True  # Always enabled
+DATABASE_URL = sqlite+aiosqlite:///data/db/learning.db
+LLM_MODEL_PATH = data/models
 ```
 
-### Configurable Environment Variables
+### Environment Variables
 ```bash
-# LLM (llama-cpp-python)
 DEFAULT_MODEL=Qwen3.5-2B-Q4_K_M.gguf
-LLM_GPU_LAYERS=-1          # -1=auto, 0=CPU only, N=specific layers
+LLM_GPU_LAYERS=-1        # -1=auto, 0=CPU, N=layers
 LLM_CONTEXT_SIZE=8192
 LLM_THREADS=4
-
-# YouTube Download
 YOUTUBE_DOWNLOAD_QUALITY=720
 YOUTUBE_AUDIO_QUALITY=128k
-
-# Chunking
-CHUNK_DURATION=300         # Target duration in seconds (~5 min)
+CHUNK_DURATION=180       # 3 minutes
 ```
 
 ---
@@ -418,31 +236,16 @@ CHUNK_DURATION=300         # Target duration in seconds (~5 min)
 ## Storage Structure
 
 ```
-PROJECT_ROOT/data/
-├── db/
-│   └── learning.db         # SQLite database
-├── models/
-│   └── Qwen3.5-2B-Q4_K_M.gguf  # LLM model file
-├── videos/
-│   └── {video_id}.webm    # Downloaded YouTube videos
-├── subtitles/
-│   └── {video_id}.{lang}.{ext}  # Downloaded subtitle files
+data/
+├── db/learning.db         # SQLite database
+├── models/                # LLM model files
+├── videos/                # Downloaded YouTube videos
+├── subtitles/             # Downloaded subtitle files
 ├── transcripts/
-│   ├── youtube/
-│   │   └── {video_id}.json
-│   └── whisper/
-│       └── {video_id}.json
-└── audios/
-    └── {video_id}/
-        ├── chunk_0.mp3
-        ├── chunk_1.mp3
-        └── ...
+│   ├── youtube/           # YouTube transcripts (JSON)
+│   └── whisper/           # Whisper transcripts (JSON)
+└── audios/{video_id}/    # Per-chunk MP3 files
 ```
-
-**Important Notes:**
-- Video chunks are **virtual** (timestamps only, no physical files)
-- Audio files are **extracted per chunk** for audio-only listening
-- Original video files are **preserved** for playback
 
 ---
 
@@ -450,33 +253,14 @@ PROJECT_ROOT/data/
 
 Located: `app/utils/gpu_utils.py`
 
-### GPU Auto-Detection
-- Automatically detects NVIDIA GPUs using GPUtil
-- Calculates optimal GPU layers based on available VRAM
-- Safety buffer of 1GB leaves room for other operations
+- Auto-detects NVIDIA GPUs via GPUtil
+- VRAM-based layer calculation (~80MB/layer for 2B Q4_K_M)
+- Safety buffer of 1GB
 
-### VRAM Estimates (Q4_K_M Quantization)
-| Model Size | Memory/Layer | Total Layers |
-|------------|-------------|-------------|
-| 0.5B | 35MB | 24 |
-| 1.5B | 45MB | 28 |
-| 2B | 50MB | 28 |
-| 3B | 80MB | 28 |
-| 4B | 90MB | 34 |
-
-### Configuration Options
 ```python
-# LLM_GPU_LAYERS=-1: Auto-detect based on available VRAM
-# LLM_GPU_LAYERS=0: CPU-only mode
-# LLM_GPU_LAYERS=N: Offload N specific layers
-```
-
-### GPU Detection Flow
-```
-1. Detect all NVIDIA GPUs
-2. Sort by free VRAM (highest first)
-3. Calculate optimal layers = min(available_vram / layer_memory, total_layers)
-4. Return config with n_gpu_layers and backend (cuda/cpu)
+LLM_GPU_LAYERS=-1  # Auto-detect
+LLM_GPU_LAYERS=0   # CPU only
+LLM_GPU_LAYERS=N   # N specific layers
 ```
 
 ---
@@ -484,52 +268,12 @@ Located: `app/utils/gpu_utils.py`
 ## Dependencies
 
 ```toml
-# Core
-fastapi>=0.100.0
-uvicorn[standard]>=0.23.0
-pydantic>=2.0.0
-pydantic-settings>=2.0.0
-
-# Database
-sqlalchemy[asyncio]>=2.0.0
-aiosqlite>=0.19.0
-alembic>=1.12.0
-
-# Video Processing
-ffmpeg-python>=0.2.0
-yt-dlp>=2024.1.0
-
-# Transcription
-pysubs2>=1.6.0
-faster-whisper>=0.10.0
-
-# LLM
-llama-cpp-python>=0.2.0
-
-# GPU
-gputil>=1.4.0
-
-# Async
-httpx>=0.24.0
-```
-
----
-
-## Language Requirements
-
-**MANDATORY: All Chinese text must use Traditional Chinese (繁體中文).**
-
-This applies to:
-- LLM-generated content (vocabulary definitions, grammar explanations, notes)
-- API responses containing Chinese text
-- Any Chinese feedback or explanations
-
-LLM prompts must include:
-```
-IMPORTANT: When generating any Chinese text (definitions, explanations, notes, feedback),
-you MUST use Traditional Chinese (繁體中文). Do NOT use Simplified Chinese.
-Examples of Traditional Chinese: 是、開發、學習、詞彙、語法
-Examples to AVOID (Simplified): 是、开发、学习、词汇、语法
+fastapi>=0.100.0, uvicorn[standard]>=0.23.0
+pydantic>=2.0.0, pydantic-settings>=2.0.0
+sqlalchemy[asyncio]>=2.0.0, aiosqlite>=0.19.0
+yt-dlp>=2024.1.0, ffmpeg-python>=0.2.0
+pysubs2>=1.6.0, faster-whisper>=0.10.0
+llama-cpp-python>=0.2.0, gputil>=1.4.0
 ```
 
 ---
@@ -537,16 +281,6 @@ Examples to AVOID (Simplified): 是、开发、学习、词汇、语法
 ## Testing
 
 ```bash
-# Run all tests
 uv run pytest
-
-# Run with coverage
 uv run pytest --cov=app
-
-# Run specific test file
-uv run pytest tests/unit/test_video_service.py
 ```
-
----
-
-**End of Backend Summary**
