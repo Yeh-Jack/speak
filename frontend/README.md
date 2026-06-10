@@ -1,6 +1,6 @@
 # English Learning Frontend
 
-Vue 3.5 + TypeScript + Vite frontend for the AI-powered English education platform.
+Vue 3.5 + TypeScript + Vite frontend for AI-powered English learning platform.
 
 ## Prerequisites
 
@@ -9,66 +9,65 @@ Vue 3.5 + TypeScript + Vite frontend for the AI-powered English education platfo
 
 ## Setup
 
-1. Use correct Node.js version:
 ```bash
 nvm use
-```
-
-2. Install dependencies:
-```bash
 pnpm install
-```
-
-3. Set up environment:
-```bash
 cp .env.example .env.local
-# Edit .env.local with your configuration
-```
-
-4. Start development server:
-```bash
 pnpm dev
 ```
 
 ## Docker
 
-The frontend Docker image uses Node.js 22 (see Dockerfile).
+Docker image uses Node.js 22 (see Dockerfile).
 
 ## Project Structure
 
 ```
 src/
-├── components/          # Vue components
-│   ├── common/           # Button, Input, Modal, etc.
-│   ├── layout/          # Header, Sidebar, Footer
-│   ├── video/           # VideoPlayer, SubtitleTrack
-│   ├── learning/        # VocabularyCard, StudyPlanView
-│   ├── speaking/        # AudioRecorder, PronunciationView
-│   └── exam/            # QuestionView, ExamTimer
-├── views/               # Page components (Vue views)
-├── composables/         # Vue composables (replacing React hooks)
-├── services/            # API services
-├── stores/              # Pinia stores
-├── types/               # TypeScript types
-├── utils/               # Utility functions
-├── router/              # Vue Router configuration
-└── App.vue              # Root component
+├── components/
+│   ├── common/           # Button, Input, LocaleText
+│   ├── layout/           # AppHeader
+│   ├── video/            # VideoPlayer
+│   └── learning/         # VocabularyCard, StudyPlanDisplay, ShadowingMode
+├── views/                # Page components
+├── composables/           # useI18n, useAuth
+├── services/             # API services
+├── stores/               # Pinia stores
+├── types/                # TypeScript interfaces
+├── router/               # Vue Router
+├── App.vue
+└── main.ts
 ```
 
-## Key Differences from React
+## Views
 
-- **Components**: `.vue` files with `<template>`, `<script setup>`, `<style>`
-- **State Management**: Pinia instead of Zustand/Redux
-- **Data Fetching**: Vue Query via `@tanstack/vue-query` or VueUse `useFetch`
-- **Router**: Vue Router instead of React Router
-- **Composables**: Vue composables instead of React hooks
+- `/` - DashboardView (video list, stats, add video modal)
+- `/videos/:id` - VideoPlayerView (player, chunks, transcript, study plan)
+- `/speaking` - SpeakingPracticeView (segment practice, recording, scoring)
+- `/settings` - SettingsView (placeholder)
 
-## Vue 3.5 Features Used
+## Key Features
 
-- `<script setup>` syntax
-- Composition API
-- Reactive refs with `.value`
-- Computed properties
-- Watch and watchEffect
-- Lifecycle hooks (onMounted, etc.)
-- DefineProps and DefineEmits macros
+- Custom video player with keyboard shortcuts
+- Bilingual display (EN/ZH toggle)
+- Vocabulary cards with SM-2 spaced repetition
+- Shadowing mode with speech recognition
+- CEFR level badges (A1-C2)
+
+## Environment Variables
+
+```bash
+VITE_API_URL=http://localhost:8080
+VITE_DEFAULT_CHUNK_SIZE=30
+VITE_YOUTUBE_DOWNLOAD_QUALITY=720
+VITE_YOUTUBE_AUDIO_QUALITY=128k
+```
+
+## Tech Stack
+
+- Vue 3.5 (Composition API, `<script setup>`)
+- TypeScript (strict mode)
+- Pinia (state management)
+- Vue Router 4
+- Axios
+- Tailwind CSS

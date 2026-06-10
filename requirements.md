@@ -39,7 +39,7 @@ Examples to AVOID (Simplified): 是、开发、学习、词汇、语法
 
 | Component | Technology | Version/Notes |
 |-----------|------------|---------------|
-| **Backend** | FastAPI | Python 3.13+ |
+| **Backend** | FastAPI | Python 3.12 (CUDA restriction) |
 | **Frontend** | Vue 3.5 + TypeScript + pnpm | Modern browsers (5 years) |
 | **Database** | SQLite3 | Single file (learning.db) with WAL mode |
 | **Authentication** | None | Single user, no auth required |
@@ -55,6 +55,7 @@ Examples to AVOID (Simplified): 是、开发、学习、词汇、语法
 - **Framework**: llama-cpp-python (Python bindings, no separate container)
 - **GPU Support**: NVIDIA GPU detection and auto-configuration
 - **NVIDIA**: GPUtil + CUDA backend
+- **Python Version Restriction**: **Python 3.12 required** for CUDA support. llama-cpp-python with CUDA does not support Python 3.13+. Use `LLM_GPU_LAYERS=0` for CPU-only mode on Python 3.13+.
 - **GPU Configuration**:
   - `LLM_GPU_LAYERS=-1`: Auto-detect based on available VRAM
   - `LLM_GPU_LAYERS=N`: Offload N specific layers
@@ -490,7 +491,7 @@ ffmpeg -i input.mp4 -vn -acodec pcm_s16le -ar 16000 audio.wav
 
 ```yaml
 services:
-  backend: FastAPI + Python 3.13+ + llama-cpp-python
+  backend: FastAPI + Python 3.12 + llama-cpp-python
   frontend: Vue 3.5 + TypeScript
 # Note: No PostgreSQL, no Redis, no Celery, no task queue, no auth service
 ```

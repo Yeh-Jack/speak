@@ -83,17 +83,6 @@ def _transform_study_plan(sp) -> dict:
     }
 
 
-def get_video_service(db: AsyncSession) -> VideoService:
-    """Dependency for VideoService."""
-    return VideoService(
-        video_repo=VideoRepository(db),
-        chunk_repo=ChunkRepository(db),
-        transcript_repo=TranscriptRepository(db),
-        study_plan_repo=StudyPlanRepository(db),
-        storage_dir=DATA_DIR,
-    )
-
-
 @router.get("", response_model=list[Video])
 async def list_videos(
     skip: int = 0,

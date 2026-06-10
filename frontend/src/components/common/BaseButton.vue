@@ -17,7 +17,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const variantClasses = {
   primary: 'bg-learning-accent-primary hover:bg-learning-accent-primary/90 text-white shadow-md hover:shadow-lg',
-  secondary: 'bg-learning-bg-primary hover:bg-learning-bg-secondary text-learning-text-primary border border-learning-bg-tertiary',
+  secondary: 'bg-learning-bg-primary text-learning-text-primary border border-learning-bg-tertiary',
   ghost: 'bg-transparent hover:bg-learning-bg-primary text-learning-text-secondary hover:text-learning-text-primary',
 };
 
@@ -30,6 +30,7 @@ const sizeClasses = {
 
 <template>
   <button
+    v-spray
     :type="type"
     :disabled="disabled || loading"
     class="inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-learning-accent-primary/50"

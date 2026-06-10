@@ -63,15 +63,76 @@ const currentTranscriptSegments = computed((): TranscriptSegment[] => {
   return videoStore.currentTranscript?.segments || [];
 });
 
-const shadowingSentences = computed(() =>
-  currentTranscriptSegments.value.map((seg, index) => ({
-    id: `sentence-${index}`,
-    text: seg.text,
-    startTime: seg.start,
-    endTime: seg.end,
-    translation: seg.text,
-  }))
-);
+const SENTENCE_END_REGEX = /[.!?]['"]*$/;
+
+const shadowingSentences = computed(() => {
+  const sentences: Array<{
+    id: string;
+    text: string;
+    startTime: number;
+    endTime: number;
+    translation?: string;
+    chunkIndex: number;
+  }> = [];
+
+  let currentText = '';
+  let currentStartTime = 0;
+  let currentEndTime = 0;
+
+  const segments = currentTranscriptSegments.value;
+  
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    
+    if (!currentText) {
+      currentStartTime = seg.start;
+    }
+    currentText += (currentText ? ' ' : '') + seg.text;
+    currentEndTime = seg.end;
+
+    const trimmedText = currentText.trim();
+    if (SENTENCE_END_REGEX.test(trimmedText)) {
+      const nextSeg = segments[i + 1];
+      const sentenceEndTime = nextSeg ? nextSeg.start : seg.end;
+      
+      const chunkIndex = videoStore.chunks.findIndex((chunk) => {
+        const tolerance = 1;
+        return currentStartTime >= chunk.start_time - tolerance &&
+               sentenceEndTime <= chunk.end_time + tolerance;
+      });
+
+      sentences.push({
+        id: `sentence-${sentences.length}`,
+        text: trimmedText,
+        startTime: currentStartTime,
+        endTime: sentenceEndTime,
+        translation: trimmedText,
+        chunkIndex: chunkIndex >= 0 ? chunkIndex : videoStore.currentChunkIndex,
+      });
+
+      currentText = '';
+    }
+  }
+
+  if (currentText.trim()) {
+    const chunkIndex = videoStore.chunks.findIndex((chunk) => {
+      const tolerance = 1;
+      return currentStartTime >= chunk.start_time - tolerance &&
+             currentEndTime <= chunk.end_time + tolerance;
+    });
+
+    sentences.push({
+      id: `sentence-${sentences.length}`,
+      text: currentText.trim(),
+      startTime: currentStartTime,
+      endTime: currentEndTime,
+      translation: currentText.trim(),
+      chunkIndex: chunkIndex >= 0 ? chunkIndex : videoStore.currentChunkIndex,
+    });
+  }
+
+  return sentences;
+});
 
 const studyPlanProps = computed(() => {
   const plan = videoStore.currentStudyPlan;
@@ -314,7 +375,7 @@ onMounted(() => {
                   class="px-3 py-2 rounded-lg text-sm font-medium transition-all text-center leading-tight min-w-[3.5rem]"
                   :class="videoStore.currentChunkIndex === index
                     ? 'bg-learning-accent-primary text-white'
-                    : 'bg-learning-bg-primary text-learning-text-secondary hover:bg-learning-bg-secondary'"
+                    : 'bg-learning-bg-primary text-learning-text-secondary hover:bg-learning-surface-hover'"
                 >
                   <span class="block">{{ index + 1 }}</span>
                   <span class="block text-xs opacity-70 font-mono">{{ Math.floor(chunk.start_time / 60).toString().padStart(2, '0') }}:{{ Math.floor(chunk.start_time % 60).toString().padStart(2, '0') }}</span>
@@ -361,8 +422,9 @@ onMounted(() => {
               </h3>
               <div class="space-y-3">
                 <button
+                  v-spray
                   @click="showShadowingMode = !showShadowingMode"
-                  class="w-full flex items-center gap-3 px-4 py-3 bg-learning-bg-primary hover:bg-learning-bg-secondary rounded-lg transition-colors text-left"
+                  class="w-full flex items-center gap-3 px-4 py-3 bg-learning-bg-primary rounded-lg transition-colors text-left"
                   :class="showShadowingMode ? 'ring-2 ring-learning-accent-primary' : ''"
                 >
                   <div class="w-10 h-10 rounded-lg bg-learning-accent-primary/10 flex items-center justify-center">
@@ -383,19 +445,30 @@ onMounted(() => {
                   </svg>
                 </button>
 
-                <div v-if="showShadowingMode" class="mt-4">
-                  <ShadowingMode
-                    :sentences="shadowingSentences"
-                    :is-active="showShadowingMode"
-                    @sentence-complete="handleSentenceComplete"
-                    @practice-complete="handlePracticeComplete"
-                    @close="showShadowingMode = false"
-                  />
-                </div>
+                <Transition
+                    enter-active-class="transition-all duration-300 ease-out"
+                    enter-from-class="max-h-0 opacity-0 -translate-y-2"
+                    enter-to-class="max-h-[500px] opacity-100 translate-y-0"
+                    leave-active-class="transition-all duration-200 ease-in"
+                    leave-from-class="max-h-[500px] opacity-100 translate-y-0"
+                    leave-to-class="max-h-0 opacity-0 -translate-y-2"
+                  >
+                    <div v-if="showShadowingMode" class="mt-4 overflow-hidden rounded-lg">
+                      <ShadowingMode
+                        :sentences="shadowingSentences"
+                        :video-id="videoId"
+                        :is-active="showShadowingMode"
+                        @sentence-complete="handleSentenceComplete"
+                        @practice-complete="handlePracticeComplete"
+                        @close="showShadowingMode = false"
+                      />
+                    </div>
+                  </Transition>
 
                 <button
+                  v-spray
                   @click="showFavoriteVocabulary = !showFavoriteVocabulary"
-                  class="w-full flex items-center gap-3 px-4 py-3 bg-learning-bg-primary hover:bg-learning-bg-secondary rounded-lg transition-colors text-left"
+                  class="w-full flex items-center gap-3 px-4 py-3 bg-learning-bg-primary rounded-lg transition-colors text-left"
                   :class="showFavoriteVocabulary ? 'ring-2 ring-learning-accent-primary' : ''"
                 >
                   <div class="w-10 h-10 rounded-lg bg-yellow-500/10 flex items-center justify-center">
@@ -416,24 +489,34 @@ onMounted(() => {
                   </svg>
                 </button>
 
-                <div v-if="showFavoriteVocabulary" class="mt-4 p-4 bg-learning-bg-primary rounded-lg">
-                  <div v-if="videoStore.favoriteVocabularyCount === 0" class="text-center text-learning-text-muted text-sm py-4">
-                    {{ t('No favorite vocabulary yet. Click the star on any word to add it here.', '尚無收藏詞匯。點擊任意單詞的星號添加到這裡。') }}
-                  </div>
-                  <div v-else class="flex flex-wrap gap-2">
-                    <span
-                      v-for="word in Array.from(videoStore.favoriteVocabulary)"
-                      :key="word"
-                      class="px-3 py-1 bg-learning-accent-secondary/20 text-learning-accent-secondary rounded-full text-sm"
-                    >
-                      {{ word }}
-                    </span>
-                  </div>
-                </div>
+                <Transition
+                    enter-active-class="transition-all duration-300 ease-out"
+                    enter-from-class="max-h-0 opacity-0 -translate-y-2"
+                    enter-to-class="max-h-[500px] opacity-100 translate-y-0"
+                    leave-active-class="transition-all duration-200 ease-in"
+                    leave-from-class="max-h-[500px] opacity-100 translate-y-0"
+                    leave-to-class="max-h-0 opacity-0 -translate-y-2"
+                  >
+                    <div v-if="showFavoriteVocabulary" class="mt-4 p-4 bg-learning-bg-expanded rounded-lg overflow-hidden">
+                      <div v-if="videoStore.favoriteVocabularyCount === 0" class="text-center text-learning-text-muted text-sm py-4">
+                        {{ t('No favorite vocabulary yet. Click the star on any word to add it here.', '尚無收藏詞匯。點擊任意單詞的星號添加到這裡。') }}
+                      </div>
+                      <div v-else class="flex flex-wrap gap-2">
+                        <span
+                          v-for="word in Array.from(videoStore.favoriteVocabulary)"
+                          :key="word"
+                          class="px-3 py-1 bg-learning-accent-secondary/20 text-learning-accent-secondary rounded-full text-sm"
+                        >
+                          {{ word }}
+                        </span>
+                      </div>
+                    </div>
+                  </Transition>
 
                 <button
+                  v-spray
                   @click="showVocabularyReview = true"
-                  class="w-full flex items-center gap-3 px-4 py-3 bg-learning-bg-primary hover:bg-learning-bg-secondary rounded-lg transition-colors text-left"
+                  class="w-full flex items-center gap-3 px-4 py-3 bg-learning-bg-primary rounded-lg transition-colors text-left"
                 >
                   <div class="w-10 h-10 rounded-lg bg-learning-accent-secondary/10 flex items-center justify-center">
                     <svg class="w-5 h-5 text-learning-accent-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -447,8 +530,9 @@ onMounted(() => {
                 </button>
 
                 <button
+                  v-spray
                   @click="showGrammarNotes = true"
-                  class="w-full flex items-center gap-3 px-4 py-3 bg-learning-bg-primary hover:bg-learning-bg-secondary rounded-lg transition-colors text-left"
+                  class="w-full flex items-center gap-3 px-4 py-3 bg-learning-bg-primary rounded-lg transition-colors text-left"
                 >
                   <div class="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
                     <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

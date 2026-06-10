@@ -55,10 +55,3 @@ class StudyPlan(StudyPlanBase):
     notes: str | None
     notes_zh: str | None
     created_at: datetime
-    updated_at: datetime
-
-
-class StudyPlanInDB(StudyPlan):
-    """Study plan schema with internal fields."""
-
-    pass

@@ -188,7 +188,8 @@ const cefrLevelColor = (level: string | undefined) => {
         <div
           v-for="(vocab, index) in vocabularyItems"
           :key="index"
-          class="p-3 bg-learning-bg-primary rounded-lg hover:bg-learning-bg-secondary transition-colors"
+          v-spray
+          class="p-3 bg-learning-bg-primary rounded-lg transition-colors"
         >
           <div class="flex items-center gap-2 mb-2 flex-wrap">
             <span

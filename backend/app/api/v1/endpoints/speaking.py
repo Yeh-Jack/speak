@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
 from app.core.config import DATA_DIR
-from app.models.video import Video
 from app.repositories import VideoRepository, TranscriptRepository
 from app.services.speaking_service import SpeakingService
 

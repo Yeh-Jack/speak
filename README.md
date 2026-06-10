@@ -14,7 +14,7 @@ Users submit YouTube URLs (movies, TV shows, TED talks) and the system generates
 
 | Component | Technology |
 |-----------|------------|
-| Backend | FastAPI + Python 3.13+ + uv |
+| Backend | FastAPI + Python 3.12 + uv |
 | Frontend | Vue 3.5 + TypeScript + Vite |
 | Database | SQLite3 (learning.db) |
 | LLM | llama-cpp-python (Qwen3.5-2B-Q4_K_M) |
@@ -23,23 +23,28 @@ Users submit YouTube URLs (movies, TV shows, TED talks) and the system generates
 
 ## Quick Start
 
-### Docker (Recommended)
-
-```bash
-docker-compose up -d
-```
-
-Access:
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:8080/docs
-
 ### Local Development
 
 **Backend:**
 ```bash
+# Install ffmpeg
+sudo apt update && sudo apt install -y ffmpeg
+
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# --- Install NVIDIA driver and CUDA tool kit if NVIDIA GPU ia available. ---
+
+# Create virtual environment.
 cd backend
+uv venv
+source .venv/bin/activate
+
+# Install dependent packages.
 uv sync
-uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
+
+# Start the backend server.
+uv run --python 3.12 uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
 ```
 
 **Frontend:**
@@ -48,6 +53,16 @@ cd frontend
 pnpm install
 pnpm dev
 ```
+
+### Docker
+**Not available yet.**
+```bash
+docker-compose up -d
+```
+
+Access:
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8080/api/v1/
 
 ## Project Structure
 
@@ -108,9 +123,8 @@ If processing fails at any step, the video stays in the last successful state wi
 ## Key Design Decisions
 
 - **Single-user app** - No authentication
-- **YouTube only** - No local file uploads
+- **YouTube only** - Video source supports YouTube only
 - **Single fixed LLM** - Qwen3.5-2B-Q4_K_M.gguf only (no model switching)
-- **No NAS** - Local storage only
 - **No background queues** - All processing immediate async with await
 
 ## Documentation

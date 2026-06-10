@@ -31,12 +31,6 @@ class VideoChunkBase(BaseModel):
     duration: float
 
 
-class VideoChunkCreate(VideoChunkBase):
-    """Schema for creating a video chunk."""
-
-    pass
-
-
 class VideoChunkUpdate(BaseModel):
     """Schema for updating a video chunk."""
 
