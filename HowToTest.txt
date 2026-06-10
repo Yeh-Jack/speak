@@ -33,6 +33,10 @@ Toy Story 5 : https://www.youtube.com/watch?v=fh7MTAQGxEg
 RTX Spark : https://www.youtube.com/watch?v=H4nJo-oqAro
 NVIDIA GTC : https://www.youtube.com/watch?v=SPGn9MZb1a0
 
+Chat message:
+Which type is this movie (in Chinese)?
+Who is the main character (in English) ?
+
 # 4. Create video from YouTube (test with a short video)
 curl -X POST http://localhost:8080/api/v1/videos/youtube \
   -H "Content-Type: application/json" \
@@ -60,7 +64,7 @@ curl -X PATCH "http://localhost:8080/api/v1/videos/{video_id}" \
   -d '{"status": "chunking_complete"}'
 
 # 9. Retry downloading:
-curl -X POST "http://localhost:8080/api/v1/videos/d0a57cb8-7a0b-46ff-bfdb-c8ec0207ca14/retry"
+curl -X POST "https://192.168.1.109:8080/api/v1/videos/{video_id}/retry"
 
 # 10. Get video chunks
 curl http://localhost:8080/api/v1/videos/{video_id}/chunks

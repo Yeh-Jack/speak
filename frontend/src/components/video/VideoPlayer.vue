@@ -174,6 +174,13 @@ function handleMouseMove() {
 }
 
 function handleKeydown(event: KeyboardEvent) {
+  const target = event.target as HTMLElement;
+  const isInputField = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+  if (isInputField && event.code === 'Space') {
+    return;
+  }
+
   switch (event.code) {
     case 'Space':
       event.preventDefault();

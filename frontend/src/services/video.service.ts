@@ -1,6 +1,86 @@
 import api from './api';
 import type { Video, VideoChunk, Transcript } from '@/types';
 
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+export interface StreamChatOptions {
+  videoId?: string;
+  messages: ChatMessage[];
+  systemPrompt?: string;
+  onToken?: (token: string, done: boolean) => void;
+  onError?: (error: Error) => void;
+}
+
+export async function streamChat(options: StreamChatOptions): Promise<void> {
+  const { videoId, messages, systemPrompt, onToken, onError } = options;
+
+  let baseUrl = '/api/v1';
+  if ((window as any).__API_CONFIG_PROMISE__) {
+    await (window as any).__API_CONFIG_PROMISE__;
+  }
+  if ((window as any).__API_URL__ && (window as any).__API_URL__.includes('://')) {
+    baseUrl = `${(window as any).__API_URL__}/api/v1`;
+  }
+
+  const response = await fetch(`${baseUrl}/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      video_id: videoId || null,
+      messages: messages.map(m => ({ role: m.role, content: m.content })),
+      system_prompt: systemPrompt || null,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Chat request failed: ${response.status}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error('No response body');
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.error) {
+              onError?.(new Error(data.error));
+              return;
+            }
+            onToken?.(data.token || '', data.done || false);
+            if (data.done) {
+              return;
+            }
+          } catch {
+            // Skip invalid JSON
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 export interface StudyPlanResponse {
   id: string;
   video_id: string;

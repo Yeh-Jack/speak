@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router';
 import { useVideoStore } from '@/stores';
 import { useLanguageStore } from '@/stores/language.store';
 import { useI18n } from '@/composables/useI18n';
-import { videoService } from '@/services/video.service';
+import { videoService, streamChat, type ChatMessage } from '@/services/video.service';
 import { statsService } from '@/services/stats.service';
 import VideoPlayer from '@/components/video/VideoPlayer.vue';
 import StudyPlanDisplay from '@/components/learning/StudyPlanDisplay.vue';
@@ -23,6 +23,12 @@ const showShadowingMode = ref(false);
 const showVocabularyReview = ref(false);
 const showGrammarNotes = ref(false);
 const showFavoriteVocabulary = ref(false);
+const showChat = ref(false);
+const chatMessages = ref<ChatMessage[]>([]);
+const chatInput = ref('');
+const isStreamingChat = ref(false);
+const chatError = ref<string | null>(null);
+const chatMessagesContainer = ref<HTMLElement | null>(null);
 const videoRef = ref<InstanceType<typeof VideoPlayer> | null>(null);
 const currentTime = ref(0);
 const isLoading = ref(false);
@@ -240,6 +246,53 @@ function handleSelectObjective(objectiveId: string) {
     default:
       break;
   }
+}
+
+async function sendChatMessage() {
+  const message = chatInput.value.trim();
+  if (!message || isStreamingChat.value) return;
+
+  chatMessages.value.push({ role: 'user', content: message });
+  chatInput.value = '';
+  chatError.value = null;
+  isStreamingChat.value = true;
+  scrollChatToBottom();
+
+  const assistantMessage: ChatMessage = { role: 'assistant', content: '' };
+  chatMessages.value.push(assistantMessage);
+
+  try {
+    await streamChat({
+      videoId: videoId.value,
+      messages: chatMessages.value.slice(0, -1),
+      onToken: (token, done) => {
+        if (!done) {
+          assistantMessage.content += token;
+          scrollChatToBottom();
+        }
+      },
+      onError: (err) => {
+        chatError.value = err.message;
+      },
+    });
+  } catch (err: any) {
+    chatError.value = err.message || 'Failed to get response';
+  } finally {
+    isStreamingChat.value = false;
+  }
+}
+
+function clearChat() {
+  chatMessages.value = [];
+  chatError.value = null;
+}
+
+function scrollChatToBottom() {
+  nextTick(() => {
+    if (chatMessagesContainer.value) {
+      chatMessagesContainer.value.scrollTop = chatMessagesContainer.value.scrollHeight;
+    }
+  });
 }
 
 async function fetchVideoData() {
@@ -464,6 +517,102 @@ onMounted(() => {
                       />
                     </div>
                   </Transition>
+
+                <button
+                  v-spray
+                  @click="showChat = !showChat"
+                  class="w-full flex items-center gap-3 px-4 py-3 bg-learning-bg-primary rounded-lg transition-colors text-left"
+                  :class="showChat ? 'ring-2 ring-learning-accent-primary' : ''"
+                >
+                  <div class="w-10 h-10 rounded-lg bg-learning-accent-tertiary/10 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-learning-accent-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                  </div>
+                  <div class="flex-1">
+                    <p class="font-medium text-learning-text-primary">{{ t('Chat with Tutor', '導師聊天') }}</p>
+                    <p class="text-sm text-learning-text-secondary">{{ t('Ask questions', '提出問題') }}</p>
+                  </div>
+                  <svg
+                    class="w-5 h-5 text-learning-text-muted transition-transform"
+                    :class="showChat ? 'rotate-180' : ''"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                <Transition
+                  enter-active-class="transition-all duration-300 ease-out"
+                  enter-from-class="max-h-0 opacity-0 -translate-y-2"
+                  enter-to-class="max-h-[500px] opacity-100 translate-y-0"
+                  leave-active-class="transition-all duration-200 ease-in"
+                  leave-from-class="max-h-[500px] opacity-100 translate-y-0"
+                  leave-to-class="max-h-0 opacity-0 -translate-y-2"
+                >
+                  <div v-if="showChat" class="mt-4 overflow-hidden rounded-lg">
+                    <div class="bg-learning-bg-expanded rounded-lg border border-learning-bg-tertiary">
+                      <div class="p-3 border-b border-learning-bg-tertiary flex items-center justify-between">
+                        <span class="text-sm font-medium text-learning-text-primary">{{ t('AI Tutor', 'AI 導師') }}</span>
+                        <button
+                          @click="clearChat"
+                          class="text-xs text-learning-text-muted hover:text-learning-text-primary"
+                        >
+                          {{ t('Clear', '清除') }}
+                        </button>
+                      </div>
+                      <div ref="chatMessagesContainer" class="h-64 overflow-y-auto p-3 space-y-3">
+                        <div v-if="chatMessages.length === 0" class="text-center text-learning-text-muted text-sm py-8">
+                          {{ t('Ask me anything about this video!', '問我關於這個影片的任何問題！') }}
+                        </div>
+                        <div
+                          v-for="(msg, index) in chatMessages"
+                          :key="index"
+                          class="flex"
+                          :class="msg.role === 'user' ? 'justify-end' : 'justify-start'"
+                        >
+                          <div
+                            class="max-w-[85%] px-3 py-2 rounded-lg text-sm"
+                            :class="msg.role === 'user'
+                              ? 'bg-learning-accent-primary text-white'
+                              : 'bg-learning-bg-primary text-learning-text-primary'"
+                          >
+                            {{ msg.content }}
+                            <span v-if="msg.role === 'assistant' && isStreamingChat && index === chatMessages.length - 1" class="inline-block w-2 h-2 bg-learning-accent-tertiary/50 rounded-full ml-1 animate-pulse" />
+                          </div>
+                        </div>
+                        <div v-if="chatError" class="text-center text-red-400 text-sm py-2">
+                          {{ chatError }}
+                        </div>
+                      </div>
+                      <div class="p-3 border-t border-learning-bg-tertiary">
+                        <div class="flex gap-2">
+                          <input
+                            v-model="chatInput"
+                            type="text"
+                            :placeholder="t('Type your message...', '輸入您的訊息...')"
+                            class="flex-1 px-3 py-2 bg-learning-bg-primary border border-learning-bg-tertiary rounded-lg text-learning-text-primary placeholder-learning-text-muted text-sm focus:outline-none focus:border-learning-accent-primary"
+                            :disabled="isStreamingChat"
+                            @keyup.enter="sendChatMessage"
+                          />
+                          <button
+                            @click="sendChatMessage"
+                            :disabled="!chatInput.trim() || isStreamingChat"
+                            class="px-4 py-2 bg-learning-accent-primary hover:bg-learning-accent-primary/90 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <svg v-if="isStreamingChat" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                            </svg>
+                            <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Transition>
 
                 <button
                   v-spray
