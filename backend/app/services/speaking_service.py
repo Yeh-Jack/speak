@@ -142,10 +142,10 @@ class SpeakingService:
         Args:
             original_audio_path: Path to original audio
             user_audio_path: Path to user's recording
-            language: Language code
+            language: Whisper language code (always 'en' for English videos)
 
         Returns:
-            Dict with similarity_score and feedback
+            Dict with similarity_score, feedback_en, feedback_zh
         """
         original_text = await self.transcribe_audio(original_audio_path, language)
         user_text = await self.transcribe_audio(user_audio_path, language)
@@ -158,12 +158,12 @@ class SpeakingService:
             "original_text": original_text,
             "user_text": user_text,
             "similarity_score": round(similarity, 2),
-            "feedback": feedback,
+            **feedback,
         }
 
     def _generate_feedback(
         self, original_text: str, user_text: str, similarity: float
-    ) -> str:
+    ) -> dict:
         """Generate feedback based on comparison.
 
         Args:
@@ -172,16 +172,28 @@ class SpeakingService:
             similarity: Similarity score
 
         Returns:
-            Feedback message
+            Dict with feedback_en and feedback_zh
         """
         if similarity >= 0.8:
-            return "Excellent! Your pronunciation is very close to the original. Keep practicing!"
+            return {
+                "feedback_en": "Excellent! Your pronunciation is very close to the original. Keep practicing!",
+                "feedback_zh": "太棒了！您的發音非常接近原文。繼續保持！"
+            }
         elif similarity >= 0.6:
-            return "Good effort! Try to match the rhythm and emphasis of the original more closely."
+            return {
+                "feedback_en": "Good effort! Try to match the rhythm and emphasis of the original more closely.",
+                "feedback_zh": "很好！請嘗試更貼近原文的節奏和語調。"
+            }
         elif similarity >= 0.4:
-            return "Nice try! Focus on the key words and try to say them more clearly."
+            return {
+                "feedback_en": "Nice try! Focus on the key words and try to say them more clearly.",
+                "feedback_zh": "不錯！請專注於關鍵單詞並嘗試說得更清晰。"
+            }
         else:
-            return "Keep practicing! Listen to the original again and try to repeat each phrase carefully."
+            return {
+                "feedback_en": "Keep practicing! Listen to the original again and try to repeat each phrase carefully.",
+                "feedback_zh": "繼續加油！請再次聆聽原文並仔細重複每個句子。"
+            }
 
     async def save_recording(
         self, audio_data: bytes, video_id: str, segment_start: float
