@@ -37,7 +37,6 @@ export const useVideoStore = defineStore('video', () => {
   });
 
   const currentStudyPlan = computed(() => {
-    console.log('currentStudyPlan computed, studyPlans.value:', !!studyPlans.value);
     return studyPlans.value;
   });
 
@@ -94,12 +93,6 @@ export const useVideoStore = defineStore('video', () => {
   }
 
   function setStudyPlan(plan: StudyPlanResponse) {
-    console.log('setStudyPlan called with:', {
-      hasPlan: !!plan,
-      vocabularyCount: plan?.vocabulary?.length || 0,
-      grammarCount: plan?.grammar?.length || 0,
-      planId: plan?.id
-    });
     studyPlans.value = plan;
   }
 

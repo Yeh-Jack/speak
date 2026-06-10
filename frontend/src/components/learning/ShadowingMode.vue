@@ -44,6 +44,8 @@ const userScore = ref<Record<string, number>>({});
 const recognizedText = ref<string>('');
 const waveformBars = ref<number[]>(new Array(32).fill(8));
 const recordingError = ref<string>('');
+const micVolume = ref(1.0);
+const speakerVolume = ref(1.0);
 
 let mediaRecorder: MediaRecorder | null = null;
 let audioContext: AudioContext | null = null;
@@ -129,35 +131,69 @@ function calculateSimilarity(str1: string, str2: string): number {
 
 async function startRecording() {
   recordingError.value = '';
-  
+
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     recordingError.value = t('Recording not supported in this browser', '此瀏覽器不支援錄音');
     return;
   }
-  
+
+  const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  if (!isSecure) {
+    console.warn('[Shadowing] Recording requires HTTPS');
+  }
+
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+      },
+    });
 
     audioContext = new AudioContext();
     analyser = audioContext.createAnalyser();
     analyser.fftSize = 256;
 
     const source = audioContext.createMediaStreamSource(stream);
-    source.connect(analyser);
 
-    mediaRecorder = new MediaRecorder(stream);
+    const gainNode = audioContext.createGain();
+    gainNode.gain.value = micVolume.value;
+    source.connect(gainNode);
+    gainNode.connect(analyser);
+
+    const destStream = audioContext.createMediaStreamDestination();
+    gainNode.connect(destStream);
+
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? 'audio/webm;codecs=opus'
+      : MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : 'audio/ogg';
+
+    mediaRecorder = new MediaRecorder(destStream.stream, { mimeType });
     const chunks: Blob[] = [];
 
     mediaRecorder.ondataavailable = (e) => {
-      chunks.push(e.data);
+      if (e.data.size > 0) {
+        chunks.push(e.data);
+      }
     };
 
     mediaRecorder.onstop = () => {
-      recordedBlob.value = new Blob(chunks, { type: 'audio/webm' });
+      if (chunks.length === 0) {
+        recordedBlob.value = null;
+        return;
+      }
+      recordedBlob.value = new Blob(chunks, { type: mimeType });
       stream.getTracks().forEach((track) => track.stop());
     };
 
-    mediaRecorder.start();
+    mediaRecorder.onerror = (e) => {
+      console.error('[Shadowing] MediaRecorder error:', e);
+    };
+
+    mediaRecorder.start(100);
     isRecording.value = true;
     showWaveform.value = true;
 
@@ -208,11 +244,19 @@ async function startRecording() {
 }
 
 function stopRecording() {
+  console.log('[Shadowing] stopRecording called, current state:', {
+    hasMediaRecorder: !!mediaRecorder,
+    isRecording: isRecording.value,
+    recorderState: mediaRecorder?.state,
+  });
+
   if (mediaRecorder && isRecording.value) {
+    console.log('[Shadowing] Stopping MediaRecorder...');
     mediaRecorder.stop();
     isRecording.value = false;
     showWaveform.value = false;
     audioLevel.value = 0;
+    console.log('[Shadowing] MediaRecorder stopped');
 
     if (animationFrame) {
       cancelAnimationFrame(animationFrame);
@@ -241,15 +285,16 @@ async function playOriginal() {
 
   const sentence = currentSentence.value;
   const chunk = videoStore.chunks[sentence.chunkIndex];
-  
+
   if (!chunk) {
-    console.error('Chunk not found for index:', sentence.chunkIndex);
+    console.error('[Shadowing] Chunk not found for index:', sentence.chunkIndex);
     fallbackToTTS(sentence.text);
     return;
   }
 
   try {
     const audioUrl = await videoService.getAudioUrl(props.videoId, sentence.chunkIndex);
+
     const audio = new Audio(audioUrl);
     currentAudio = audio;
     audio.playbackRate = 0.8;
@@ -262,7 +307,7 @@ async function playOriginal() {
 
       const audioDuration = audio.duration;
       if (!isFinite(audioDuration) || audioDuration <= 0) {
-        console.error('Invalid audio duration:', audioDuration);
+        console.error('[Shadowing] Invalid audio duration:', audioDuration);
         if (currentAudio === audio) {
           currentAudio = null;
           fallbackToTTS(sentence.text);
@@ -273,6 +318,7 @@ async function playOriginal() {
       const endOffset = Math.min(audioDuration, targetEndOffset);
 
       if (endOffset <= startOffset) {
+        console.error('[Shadowing] Invalid offset range:', { startOffset, endOffset });
         if (currentAudio === audio) {
           currentAudio = null;
           fallbackToTTS(sentence.text);
@@ -282,14 +328,16 @@ async function playOriginal() {
 
       const onceHandler = () => {
         if (currentAudio !== audio) return;
+
+        console.log('[Shadowing] Setting currentTime to', startOffset);
         audio.currentTime = startOffset;
-        
+
         audio.onplaying = () => {
           if (currentAudio !== audio || intervalStarted) return;
-          
+
           intervalStarted = true;
           if (stopInterval) clearInterval(stopInterval);
-          
+
           stopInterval = setInterval(() => {
             if (currentAudio !== audio) {
               if (stopInterval) {
@@ -299,7 +347,7 @@ async function playOriginal() {
               intervalStarted = false;
               return;
             }
-            
+
             if (audio.currentTime >= endOffset) {
               if (stopInterval) {
                 clearInterval(stopInterval);
@@ -326,30 +374,32 @@ async function playOriginal() {
         };
 
         audio.onerror = (e) => {
-        if (stopInterval) {
-          clearInterval(stopInterval);
-          stopInterval = null;
-        }
-        intervalStarted = false;
-        if (currentAudio === audio) {
-          currentAudio = null;
-          fallbackToTTS(sentence.text);
-        }
-      };
+          console.error('[Shadowing] Audio playback error:', e);
+          if (stopInterval) {
+            clearInterval(stopInterval);
+            stopInterval = null;
+          }
+          intervalStarted = false;
+          if (currentAudio === audio) {
+            currentAudio = null;
+            fallbackToTTS(sentence.text);
+          }
+        };
 
-      audio.play().catch(() => {
-        if (currentAudio === audio) {
-          currentAudio = null;
-          fallbackToTTS(sentence.text);
-        }
-      });
+        audio.play().catch((err) => {
+          console.error('[Shadowing] Play promise rejected:', err);
+          if (currentAudio === audio) {
+            currentAudio = null;
+            fallbackToTTS(sentence.text);
+          }
+        });
       };
 
       audio.addEventListener('canplay', onceHandler, { once: true });
     };
 
     audio.onerror = (e) => {
-      console.error('Audio load error:', e);
+      console.error('[Shadowing] Audio load error:', e);
       if (currentAudio === audio) {
         currentAudio = null;
         fallbackToTTS(sentence.text);
@@ -358,7 +408,7 @@ async function playOriginal() {
 
     audio.load();
   } catch (err) {
-    console.error('playOriginal error:', err);
+    console.error('[Shadowing] playOriginal error:', err);
     currentAudio = null;
     isPlayingPractice.value = false;
     fallbackToTTS(sentence.text);
@@ -401,15 +451,28 @@ function fallbackToTTS(text: string) {
 }
 
 function playRecording() {
-  if (!recordedBlob.value) return;
+  if (!recordedBlob.value) {
+    return;
+  }
 
   const url = URL.createObjectURL(recordedBlob.value);
+
   const audio = new Audio(url);
-  audio.play();
+  audio.volume = speakerVolume.value;
 
   audio.onended = () => {
     URL.revokeObjectURL(url);
   };
+
+  audio.onerror = (e) => {
+    console.error('[Shadowing] Recording playback error:', e);
+    URL.revokeObjectURL(url);
+  };
+
+  audio.play().catch((err) => {
+    console.error('[Shadowing] Recording playback failed:', err);
+    URL.revokeObjectURL(url);
+  });
 }
 
 function nextSentence() {
@@ -574,6 +637,41 @@ onUnmounted(() => {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
             </svg>
           </button>
+        </div>
+
+        <div class="flex items-center justify-center gap-6 my-4">
+          <div class="flex items-center gap-2">
+            <svg class="w-4 h-4 text-learning-text-secondary" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+              <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+            </svg>
+            <span class="text-xs text-learning-text-secondary">{{ t('Mic', '麥克風') }}</span>
+            <input
+              v-model="micVolume"
+              type="range"
+              min="0"
+              max="2"
+              step="0.1"
+              class="w-20 h-1.5 bg-learning-bg-tertiary rounded-lg appearance-none cursor-pointer accent-learning-accent-primary"
+            />
+            <span class="text-xs text-learning-text-muted w-8">{{ Math.round(micVolume * 100) }}%</span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <svg class="w-4 h-4 text-learning-text-secondary" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z" />
+            </svg>
+            <span class="text-xs text-learning-text-secondary">{{ t('Speaker', '喇叭') }}</span>
+            <input
+              v-model="speakerVolume"
+              type="range"
+              min="0"
+              max="1"
+              step="0.1"
+              class="w-20 h-1.5 bg-learning-bg-tertiary rounded-lg appearance-none cursor-pointer accent-learning-accent-primary"
+            />
+            <span class="text-xs text-learning-text-muted w-8">{{ Math.round(speakerVolume * 100) }}%</span>
+          </div>
         </div>
 
         <div class="flex items-center justify-center gap-4">
