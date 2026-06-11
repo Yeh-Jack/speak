@@ -1,4 +1,6 @@
-# 英文口說學習系統 - 專案簡報
+# English Speaking Learning App - Project Presentation
+
+## 英文口說學習系統 - 專案簡報
 
 ---
 
@@ -17,6 +19,8 @@
 ║                                                               ║
 ╚═══════════════════════════════════════════════════════════════╝
 ```
+
+**建議視覺效果**：應用程式標誌、附字幕的影片播放器截圖、AI 聊天介面
 
 ---
 
@@ -73,7 +77,8 @@
 │  1. 提交 YouTube 網址                                          │
 │     → https://www.youtube.com/watch?v=3OSkg0JudmU                 │
 │                                                                │
-│  2. i18n                       │
+│  2. 觀看處理流程                                                │
+│     下載 → 語音轉文字 → 分段 → 學習計劃                        │
 │                                                                │
 │  3. 檢視生成的內容                                              │
 │     □ 含詞彙的學習計劃                                         │
@@ -229,7 +234,7 @@ POST /api/videos/youtube
 │ • 對齊至完整句子邊界                                         │
 │ • 虛擬分塊 - 使用原始影片搭配時間戳記                         │
 │                                                             │
-│ 檢查點：transcribing_complete → chunking → complete        │
+│ 檢查點：transcribing_complete → chunking → complete         │
 └─────────────────────────────┬───────────────────────────────┘
                               │
                               ▼
@@ -246,7 +251,7 @@ POST /api/videos/youtube
 │ 步驟 5：學習計劃生成（LLM）                                   │
 │ ──────────────────────────────────────────────────────────── │
 │ • 選擇最高優先級的逐字稿：                                   │
-│   使用者上傳 > youtube_author > whisper > youtube_auto      │
+│   使用者上傳 > youtube_author > whisper > youtube_auto          │
 │ • 生成：詞彙、語法、學習目標                                  │
 │ • 所有中文內容使用繁體中文                                    │
 │                                                             │
@@ -289,70 +294,80 @@ POST /api/videos/youtube
 
 ---
 
-## 投影片 7：重點程式碼 - LLM 服務
+## 投影片 7：重點程式碼 - Whisper 語音轉文字服務
 
-### LLM 服務初始化
+```python
+# app/services/transcription_service.py
+
+class WhisperTranscriptionService:
+    """使用 faster-whisper 進行音訊轉文字的服務。"""
+    def _load_model(self):
+        from faster_whisper import WhisperModel
+        self._model = WhisperModel(
+            self.model_size, # 模型大小：tiny, base, small, medium, large-v3
+            device="cpu",
+            compute_type="int8",
+            cpu_threads=4,
+        )
+
+    async def transcribe(...) -> List[dict]:
+        self._load_model()
+        segments, info = await asyncio.to_thread(
+            lambda: self._model.transcribe(
+                str(audio_path),
+                language=language, # 這裡是 'en'
+                word_timestamps=word_timestamps,
+                vad_filter=True,
+                vad_parameters=dict(min_silence_duration_ms=500),
+            ),
+        )
+```
+
+## 投影片 8：重點程式碼 - LLM 服務初始化
 
 ```python
 # app/services/llm_service.py
 
 class LLMService:
     """使用 llama-cpp-python 進行 LLM 推論的服務。"""
-    
     def _ensure_model(self) -> None:
-        """延遲載入 llama-cpp-python 模型。"""
-        if self._initialized:
-            return
-        
-        env_gpu_layers = os.getenv("LLM_GPU_LAYERS", settings.LLM_GPU_LAYERS)
-        config = get_llama_config(str(self.model_path), env_gpu_layers, model_size="2B")
-        
         from llama_cpp import Llama
-        
         self._model = Llama(
             model_path=str(self.model_path),
             n_ctx=n_ctx,           # 8192 tokens
-            n_threads=n_threads,   # CPU threads
-            n_gpu_layers=config["n_gpu_layers"],  # Auto-calculated
+            n_threads=n_threads,   # CPU 執行緒
+            n_gpu_layers=config["n_gpu_layers"],  # 自動計算
             verbose=False,
         )
-        self._initialized = True
 ```
 
-### 學習計劃生成
+## 投影片 9：重點程式碼 - 學習計劃生成
 
 ```python
-    async def generate_study_plan(
-        self,
-        transcript: dict,
-        video_title: str,
-        video_duration: float,
-    ) -> tuple[dict[str, Any], dict[str, float]]:
-        """使用 LLM 從逐字稿生成學習計劃。"""
-        
-        transcript_text = self._format_transcript_for_prompt(transcript)
-        
-        user_prompt = f"""Based on the following video transcript...
-        Transcript (first 4000 chars): {transcript_text[:4000]}
-        
-        Generate a study plan with vocabulary, grammar, and chunk summaries.
-        IMPORTANT: All Chinese translations in TRADITIONAL Chinese (繁體中文) ONLY.
+    SYSTEM_PROMPT = """你是一位專業的英語教師。你的職責是分析影片逐字稿，
+    為英語學習者創建個人化的學習計劃。
+
+    """基於逐字稿使用 LLM 生成學習計劃。"""
+    async def generate_study_plan(...) -> tuple[dict[str, Any], dict[str, float]]:
+        user_prompt = f"""基於以下影片逐字稿...
+        逐字稿（前 4000 字）：{transcript_text[:4000]}
+
+        生成包含詞彙、語法和分段摘要的學習計劃。
+        重要：所有中文翻譯必須僅使用繁體中文（繁體中文）。
         """
         
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_prompt},
         ]
-        
         response = await self._generate_response(messages)
-        return self._parse_json_response(response)
 ```
 
 **演講者備註**：說明我們如何使用 llama-cpp-python 的 GPU 自動偵測功能，以及延遲載入模式如何節省資源。
 
 ---
 
-## 投影片 8：問題與解決方案
+## 投影片 10：問題與解決方案
 
 ### 問題 1：CUDA 支援與 Python 版本
 
@@ -373,6 +388,8 @@ class LLMService:
 │  3. 新增執行期偵測和優雅降級                                    │
 └────────────────────────────────────────────────────────────────┘
 ```
+
+## 投影片 11：問題與解決方案
 
 ### 問題 2：瀏覽器音訊錄製
 
@@ -407,6 +424,8 @@ class LLMService:
 └────────────────────────────────────────────────────────────────┘
 ```
 
+## 投影片 12：問題與解決方案
+
 ### 問題 3：繁體中文支援
 
 ```
@@ -422,21 +441,21 @@ class LLMService:
 │  ────────────────────────────────────────────────────────────  │
 │  在系統提示中加入明確指示：                                     │
 │                                                                │
-│  重要：所有中文翻譯必須僅使用繁體中文。                          │
+│  重要：所有中文翻譯必須僅使用繁體中文（繁體中文）。                │
 │  範例：學習 不是 学习，詞匯 不是 词汇                           │
 └────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 投影片 9：未來改進
+## 投影片 13：未來改進
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
 │                    未來改進                                      │
 ├────────────────────────────────────────────────────────────────┤
 │                                                                │
-│  □ 模型升級（更大的 LLM 以獲得更好的學習計劃）                  │
+│  □ 模型升級（更大的 LLM 以獲得更好的推論品質）                  │
 │  □ 支援中文/英文以外的多語言                                    │
 │  □ 使用進階 ASR 改善發音回饋                                   │
 │  □ Docker Compose 簡化部署                                    │
@@ -447,7 +466,7 @@ class LLMService:
 
 ---
 
-## 投影片 10：問答時間
+## 投影片 14：問答時間
 
 ```
 ╔═══════════════════════════════════════════════════════════════╗
@@ -460,7 +479,7 @@ class LLMService:
 
 ---
 
-## 投影片 11：感謝聆聽
+## 投影片 15：感謝聆聽
 
 ```
 ╔═══════════════════════════════════════════════════════════════╗
