@@ -142,7 +142,6 @@ class VideoService:
                 video.file_path = info.get("video_path")
                 video.title = info.get("title", video.title)
                 video.duration = info.get("duration", 0.0)
-                video.subtitle_paths = info.get("subtitle_paths", {})
                 video.thumbnail = info.get("thumbnail")
                 video.uploader = info.get("uploader")
                 video.upload_date = info.get("upload_date")
@@ -162,11 +161,18 @@ class VideoService:
                 current_stage = "transcription"
                 start = time.perf_counter()
                 await self._update_status(video, "transcribing")
+                subtitle_paths = info.get("subtitle_paths", {})
                 (
                     youtube_author_transcript,
                     youtube_auto_transcript,
                     whisper_transcript,
-                ) = await self._transcribe_video(video)
+                ) = await self._transcribe_video(video, subtitle_paths)
+
+                existing_transcripts = await self.transcript_repo.get_all_by_video_id(video.id)
+                if existing_transcripts:
+                    for et in existing_transcripts:
+                        await self.transcript_repo.delete(et.id)
+                    logger.info(f"Deleted {len(existing_transcripts)} existing transcripts before recreating")
 
                 if youtube_author_transcript:
                     await self.transcript_repo.create(
@@ -206,6 +212,12 @@ class VideoService:
                 current_stage = "chunking"
                 start = time.perf_counter()
                 await self._update_status(video, "chunking")
+
+                existing_chunks = await self.chunk_repo.get_by_video_id(video.id)
+                if existing_chunks:
+                    await self.chunk_repo.delete_by_video_id(video.id)
+                    logger.info(f"Deleted {len(existing_chunks)} existing chunks before recreating")
+
                 chunks = await self._create_chunks_with_snap(video)
                 await self.chunk_repo.create_many(chunks)
                 timings.chunking_seconds = time.perf_counter() - start
@@ -334,20 +346,21 @@ class VideoService:
         ]
 
     async def _transcribe_video(
-        self, video: Video
+        self, video: Video, subtitle_paths: dict | None = None
     ) -> tuple[Optional[list[dict]], Optional[list[dict]], list[dict]]:
         """Transcribe video using triple transcript system.
 
         Always runs Whisper. Tries to get YouTube author and auto subtitles if available.
 
         Args:
-            video: Video model with file_path and subtitle_paths
+            video: Video model with file_path
+            subtitle_paths: Dict with 'author' and 'auto' subtitle paths
 
         Returns:
             Tuple of (youtube_author_transcript, youtube_auto_transcript, whisper_transcript)
         """
         video_path = Path(video.file_path)
-        subtitle_paths = getattr(video, "subtitle_paths", {}) or {}
+        subtitle_paths = subtitle_paths or {}
         (
             youtube_author_transcript,
             youtube_auto_transcript,

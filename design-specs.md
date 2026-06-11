@@ -1578,6 +1578,234 @@ class SpeakingPracticeRecord:
 
 ---
 
+## Shadowing Practice (Recording & Scoring)
+
+### Overview
+
+The Shadowing Practice mode allows users to practice speaking English by imitating audio from videos. It features real-time recording with countdown, waveform visualization, and AI-powered scoring with bilingual feedback.
+
+### Frontend Component: ShadowingMode.vue
+
+**Location**: `frontend/src/components/learning/ShadowingMode.vue`
+
+**Features**:
+- **Recording UI**: Red record button with microphone icon
+- **Countdown**: 3-second countdown before recording starts
+- **Waveform Visualization**: Real-time audio level bars during recording
+- **Playback Controls**: Play original audio, play user recording, mic/speaker volume adjustment
+- **Score Area**: Displays recognition results with bilingual feedback
+
+### Recording Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 1. Display Sentence                                          │
+│    - Show current sentence text (English + Chinese translation)│
+│    - Display progress (sentence X of Y)                      │
+└────────┬────────────────────────────────────────────────────┘
+         ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 2. User clicks Record button                                 │
+│    - 3-second countdown with visual indicator                │
+│    - Audio stream pre-requested (eliminates delay)           │
+└────────┬────────────────────────────────────────────────────┘
+         ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 3. Recording Active                                          │
+│    - Red button with pulse animation                         │
+│    - Real-time waveform visualization (32 bars)              │
+│    - Speech recognition runs concurrently                   │
+└────────┬────────────────────────────────────────────────────┘
+         ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 4. User clicks Stop (or auto-stop)                           │
+│    - Recording saved                                         │
+│    - Audio sent to backend for comparison                   │
+│    - Score area shows results                                │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Score Area Display
+
+The score area displays recognition results with:
+- **Score Percentage**: Color-coded (green ≥80%, yellow 60-80%, red <60%)
+- **Bilingual Feedback**: English and Chinese displayed on separate lines
+- **Recognized Text**: Shows what the user said (with "Recognized:" label)
+
+**When i18n is OFF**:
+```
+Great job!
+Recognized: Hello how are you
+```
+
+**When i18n is ON**:
+```
+Great job!
+很棒！
+Recognized: Hello how are you
+```
+
+### Backend API Endpoints
+
+#### GET /api/v1/speaking/videos/{video_id}/segments
+
+Get transcript segments for speaking practice.
+
+**Response**:
+```json
+{
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 5.5,
+      "text": "Hello, welcome to the show.",
+      "speaker": null
+    }
+  ],
+  "source": "whisper"
+}
+```
+
+#### GET /api/v1/speaking/videos/{video_id}/audio-segment
+
+Extract audio segment from video for playback.
+
+**Query Parameters**:
+- `start`: Start time in seconds
+- `end`: End time in seconds
+
+**Response**:
+```json
+{
+  "audio_path": "/data/recordings/segment_0.0_5.5.wav",
+  "start": 0.0,
+  "end": 5.5
+}
+```
+
+#### POST /api/v1/speaking/videos/{video_id}/compare
+
+Compare user's recording with original audio.
+
+**Request**: `multipart/form-data`
+- `file`: User's audio recording (WebM/Opus format)
+- `start`: Segment start time
+- `end`: Segment end time
+- `language`: Whisper language code (default: "en")
+
+**Response**:
+```json
+{
+  "video_id": "uuid",
+  "segment_start": 0.0,
+  "segment_end": 5.5,
+  "original_text": "Hello, welcome to the show.",
+  "user_text": "Hello welcome to the show",
+  "similarity_score": 0.85,
+  "feedback_en": "Excellent! Your pronunciation is very close to the original. Keep practicing!",
+  "feedback_zh": "太棒了！您的發音非常接近原文。繼續保持！"
+}
+```
+
+### SpeakingService Methods
+
+**Location**: `backend/app/services/speaking_service.py`
+
+```python
+class SpeakingService:
+    """Service for speaking practice with audio comparison."""
+
+    async def extract_audio_segment(
+        self,
+        video_path: Path,
+        start_time: float,
+        end_time: float,
+        output_path: Path | None = None,
+    ) -> Path:
+        """Extract audio segment from video (WAV, 16kHz mono)."""
+
+    async def transcribe_audio(self, audio_path: Path, language: str = "en") -> str:
+        """Transcribe audio file using Whisper (base model, CPU)."""
+
+    def calculate_similarity(self, original_text: str, user_text: str) -> float:
+        """Calculate word overlap ratio between two strings (0.0-1.0)."""
+
+    async def compare_recordings(
+        self,
+        original_audio_path: Path,
+        user_audio_path: Path,
+        language: str = "en",
+    ) -> dict:
+        """Compare user's recording with original using Whisper.
+
+        Returns:
+            Dict with similarity_score, feedback_en, feedback_zh,
+            original_text, user_text
+        """
+
+    def _generate_feedback(
+        self, original_text: str, user_text: str, similarity: float
+    ) -> dict:
+        """Generate feedback based on similarity score.
+
+        Feedback levels:
+        - ≥0.8: Excellent
+        - ≥0.6: Good effort
+        - ≥0.4: Nice try
+        - <0.4: Keep practicing
+        """
+
+    async def save_recording(
+        self, audio_data: bytes, video_id: str, segment_start: float
+    ) -> Path:
+        """Save user's recording to disk (WebM format)."""
+```
+
+### Similarity Scoring
+
+The similarity score is calculated using word overlap ratio:
+
+```python
+def calculate_similarity(self, original_text: str, user_text: str) -> float:
+    original_words = set(original_text.lower().split())
+    user_words = set(user_text.lower().split())
+
+    if not original_words or not user_words:
+        return 0.0
+
+    intersection = original_words & user_words
+    union = original_words | user_words
+
+    return len(intersection) / len(union)
+```
+
+### Feedback Generation
+
+Feedback is generated based on similarity threshold:
+
+| Score Range | English Feedback | Chinese Feedback |
+|------------|------------------|------------------|
+| ≥ 80% | Excellent! Your pronunciation is very close to the original. Keep practicing! | 太棒了！您的發音非常接近原文。繼續保持！ |
+| 60-80% | Good effort! Try to match the rhythm and emphasis of the original more closely. | 很好！請嘗試更貼近原文的節奏和語調。 |
+| 40-60% | Nice try! Focus on the key words and try to say them more clearly. | 不錯！請專注於關鍵單詞並嘗試說得更清晰。 |
+| < 40% | Keep practicing! Listen to the original again and try to repeat each phrase carefully. | 繼續加油！請再次聆聽原文並仔細重複每個句子。 |
+
+### i18n Mode
+
+When the i18n (internationalization) toggle is ON in settings:
+- Score feedback displays both English and Chinese on separate lines
+- English uses `text-learning-text-secondary` color (gray)
+- Chinese uses `text-learning-chinese` color (orange #f5a623)
+- Recognized text always uses `text-learning-chinese` color
+
+### Recording Settings
+
+Users can adjust:
+- **Microphone Volume**: Range slider (0-200%)
+- **Speaker Volume**: Range slider (0-100%)
+
+---
+
 ## GPU Configuration Utilities
 
 ### NVIDIA GPU Detection

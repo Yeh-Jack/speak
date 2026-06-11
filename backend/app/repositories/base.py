@@ -45,7 +45,7 @@ class BaseRepository(ABC, Generic[T]):
         existing = await self.get_by_id(id)
         if existing is None:
             return None
-        for key, value in entity.dict().items():
+        for key, value in entity.model_dump().items():
             if hasattr(existing, key):
                 setattr(existing, key, value)
         await self.session.flush()

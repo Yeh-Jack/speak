@@ -3,13 +3,14 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.api.v1.router import api_router
-from app.core.config import DATA_DIR, DATABASE_URL, settings
+from app.core.config import DATA_DIR, DATABASE_URL, FRONTEND_DIST, settings
 from app.core.logging import setup_logging, get_logger, is_verbose
 
 setup_logging(
@@ -78,29 +79,67 @@ app = FastAPI(
 )
 
 # Add CORS middleware
+cors_origins = [o.strip() for o in settings.CORS_ALLOW_ORIGINS.split(",")]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
-# Include API routers (courses and videos)
+# Include API routers
 app.include_router(api_router, prefix="/api/v1")
-
-
-@app.get("/")
-async def root():
-    """Root endpoint."""
-    return {
-        "message": "Welcome to English Learning API",
-        "version": "0.1.0",
-        "docs": "/docs",
-    }
 
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "environment": settings.ENVIRONMENT}
+
+
+@app.get("/config.js")
+async def frontend_config(request: Request):
+    """Return runtime config for frontend."""
+    # Detect protocol from request, fallback to BACKEND_URL setting
+    protocol = "https" if request.url.scheme == "https" else "http"
+    host = request.headers.get("host", settings.BACKEND_URL.split("://")[-1] if "://" in settings.BACKEND_URL else f"{settings.BACKEND_HOST}:8080")
+    api_url = f"{protocol}://{host}"
+    content = f"window.__API_URL__ = '{api_url}';"
+    return Response(content=content, media_type="application/javascript")
+
+
+# SPA fallback handler: serve index.html for client-side routes
+# Serves static files directly if they exist, otherwise returns index.html for SPA routing
+@app.get("/{path:path}", include_in_schema=False)
+async def serve_spa_or_static(path: str, request: Request):
+    """Serve frontend index.html for SPA routes, or static files if they exist."""
+    import os
+
+    # Skip API routes - let them be handled by API router
+    if path.startswith("api/"):
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=404, content={"detail": "Not Found"})
+
+    if FRONTEND_DIST.exists():
+        # Check if the requested path is a file that exists
+        file_path = FRONTEND_DIST / path
+        if file_path.is_file():
+            from starlette.staticfiles import FileResponse
+            return FileResponse(str(file_path))
+
+        # For all other paths (SPA routes), serve index.html
+        index_path = FRONTEND_DIST / "index.html"
+        if index_path.exists():
+            from fastapi.responses import FileResponse
+            return FileResponse(str(index_path))
+
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=404, content={"detail": "Not Found"})
+
+
+# Mount frontend static files (if dist exists) - but catch-all above handles all paths first
+# Actually, we don't need this anymore since the catch-all handles everything
+# if FRONTEND_DIST.exists():
+#     app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="frontend")

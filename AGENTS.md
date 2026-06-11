@@ -8,7 +8,7 @@ An AI-powered English learning platform using LLM as a personalized teacher. Use
 
 | Component | Technology |
 |-----------|------------|
-| Backend | FastAPI + Python 3.13+ + uv |
+| Backend | FastAPI + Python 3.12 + uv |
 | Frontend | Vue 3.5 + TypeScript + Vite |
 | Database | SQLite3 (learning.db) |
 | LLM | llama-cpp-python (Qwen3.5-2B-Q4_K_M) |
@@ -207,7 +207,6 @@ PROJECT_ROOT/data/
 │       ├── chunk_0.mp3 # Audio for chunk 0
 │       ├── chunk_1.mp3 # Audio for chunk 1
 │       └── ...
-└── courses/            # Course data
 ```
 
 In Docker: PROJECT_ROOT is explicitly set to `/app` via environment variable, so data is at `/app/data/`
@@ -306,10 +305,10 @@ uv add package-name
 uv add --dev package-name
 
 # Run the application
-uv run uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
 
 # Run with specific Python version
-uv run --python 3.13 uvicorn app.main:app --reload
+uv run --python 3.12 uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
 
 # Run tests
 uv run pytest

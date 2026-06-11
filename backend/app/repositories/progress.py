@@ -19,6 +19,8 @@ class ProgressRepository(BaseRepository[StudyProgress]):
         self, video_id: UUID, chunk_index: int
     ) -> StudyProgress | None:
         """Get progress for a specific video chunk."""
+        if isinstance(video_id, UUID):
+            video_id = str(video_id)
         result = await self.session.execute(
             select(StudyProgress).where(
                 StudyProgress.video_id == video_id, StudyProgress.chunk_index == chunk_index
@@ -28,6 +30,8 @@ class ProgressRepository(BaseRepository[StudyProgress]):
 
     async def get_by_video_id(self, video_id: UUID) -> list[StudyProgress]:
         """Get all progress for a video."""
+        if isinstance(video_id, UUID):
+            video_id = str(video_id)
         result = await self.session.execute(
             select(StudyProgress)
             .where(StudyProgress.video_id == video_id)
@@ -37,6 +41,8 @@ class ProgressRepository(BaseRepository[StudyProgress]):
 
     async def get_completed_chunks(self, video_id: UUID) -> list[int]:
         """Get list of completed chunk indices for a video."""
+        if isinstance(video_id, UUID):
+            video_id = str(video_id)
         result = await self.session.execute(
             select(StudyProgress.chunk_index).where(
                 StudyProgress.video_id == video_id, StudyProgress.completed.is_(True)

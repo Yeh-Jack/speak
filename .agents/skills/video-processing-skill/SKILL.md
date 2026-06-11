@@ -707,8 +707,7 @@ PROJECT_ROOT/data/
 ├── models/             # LLM model files (Qwen3.5-2B-Q4_K_M.gguf)
 ├── videos/             # Downloaded from YouTube (original file)
 ├── transcripts/        # JSON (YouTube subtitles or Whisper output)
-├── audios/             # Extracted audio
-└── courses/            # Course data
+└── audios/             # Extracted audio
 ```
 
 In Docker: PROJECT_ROOT is `/app`, so data is at `/app/data/`

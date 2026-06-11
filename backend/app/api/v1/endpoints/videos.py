@@ -10,10 +10,12 @@ from app.api.deps import get_db
 from app.core.config import DATA_DIR
 from app.repositories import (
     ChunkRepository,
+    ProgressRepository,
     StudyPlanRepository,
     TranscriptRepository,
     VideoRepository,
 )
+from app.models.progress import StudyProgress
 from app.schemas.video import (
     Video,
     VideoChunk,
@@ -24,21 +26,61 @@ from app.schemas.video import (
     ProcessingTimings,
 )
 from app.schemas.transcript import TranscriptUpload
+from app.schemas.progress import StudyProgressUpdate, ResumeInfo
 from app.services.video_service import VideoService
 from app.services.download_service import DownloadService
 
 router = APIRouter()
 
 
-def get_video_service(db: AsyncSession) -> VideoService:
-    """Dependency for VideoService."""
-    return VideoService(
-        video_repo=VideoRepository(db),
-        chunk_repo=ChunkRepository(db),
-        transcript_repo=TranscriptRepository(db),
-        study_plan_repo=StudyPlanRepository(db),
-        storage_dir=DATA_DIR,
-    )
+def _transform_vocabulary_item(item: dict) -> dict:
+    """Transform vocabulary item from database format to frontend format."""
+    example = item.get("example", "")
+    return {
+        "word": item.get("word", ""),
+        "word_zh": item.get("word_zh", ""),
+        "definition": item.get("definition", ""),
+        "definition_zh": item.get("definition_zh", ""),
+        "context": item.get("context", "") or example,
+        "context_zh": item.get("context_zh", ""),
+        "cefr_level": item.get("cefr_level", item.get("difficulty", "")).upper(),
+        "cefr_level_zh": item.get("cefr_level_zh", ""),
+        "pronunciation": item.get("pronunciation", ""),
+        "examples": [example] if example else [],
+        "examples_zh": [item.get("example_zh", "")] if item.get("example_zh") else [],
+    }
+
+
+def _transform_grammar_item(item: dict) -> dict:
+    """Transform grammar item from database format to frontend format."""
+    return {
+        "pattern": item.get("pattern", ""),
+        "pattern_zh": item.get("pattern_zh", ""),
+        "explanation": item.get("explanation", ""),
+        "explanation_zh": item.get("explanation_zh", ""),
+        "examples": item.get("examples", []) or [],
+        "examples_zh": item.get("examples_zh", []) or [],
+    }
+
+
+def _transform_study_plan(sp) -> dict:
+    """Transform study plan from database model to API response format."""
+    vocabulary = sp.vocabulary or []
+    grammar = sp.grammar or []
+
+    return {
+        "id": str(sp.id),
+        "video_id": str(sp.video_id),
+        "chunk_index": sp.chunk_index,
+        "objectives": sp.objectives or [],
+        "vocabulary": [_transform_vocabulary_item(v) for v in vocabulary],
+        "grammar": [_transform_grammar_item(g) for g in grammar],
+        "notes": sp.notes,
+        "notes_zh": getattr(sp, 'notes_zh', None),
+        "overall_difficulty": sp.overall_difficulty,
+        "estimated_time": sp.estimated_time,
+        "created_at": sp.created_at.isoformat() if sp.created_at else None,
+    }
 
 
 @router.get("", response_model=list[Video])
@@ -49,7 +91,16 @@ async def list_videos(
 ):
     """List all videos."""
     repo = VideoRepository(db)
-    return await repo.get_all(skip=skip, limit=limit)
+    videos = await repo.get_all(skip=skip, limit=limit)
+
+    study_plan_repo = StudyPlanRepository(db)
+    for video in videos:
+        overall_plan = await study_plan_repo.get_by_video_id(video.id)
+        if overall_plan:
+            video.study_plan_notes = overall_plan.notes
+            video.study_plan_notes_zh = getattr(overall_plan, 'notes_zh', None)
+
+    return videos
 
 
 @router.get("/{video_id}", response_model=Video)
@@ -146,6 +197,8 @@ async def create_video_from_youtube(
 
     try:
         video, timings = await video_service.process_video(video.id)
+        await db.commit()
+        await db.refresh(video)
         return VideoResponse(
             video=video,
             chunks=video.chunks,
@@ -302,6 +355,36 @@ async def get_chunk_audio(
     )
 
 
+@router.get("/{video_id}/stream")
+async def stream_video(
+    video_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Stream video file.
+
+    Args:
+        video_id: Video UUID
+
+    Returns:
+        Video file (webm or mp4)
+    """
+    video_repo = VideoRepository(db)
+    video = await video_repo.get_by_id(video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    video_id_str = str(video_id)
+    for ext in ["webm", "mp4"]:
+        video_path = DATA_DIR / "videos" / f"{video_id_str}.{ext}"
+        if video_path.exists():
+            return FileResponse(
+                path=video_path,
+                media_type=f"video/{ext}",
+            )
+
+    raise HTTPException(status_code=404, detail="Video file not found")
+
+
 @router.get("/{video_id}/transcripts/{transcript_type}")
 async def get_video_transcript(
     video_id: UUID,
@@ -384,3 +467,195 @@ async def upload_user_transcript(
         "segments_count": len(transcript.segments) if transcript.segments else 0,
         "message": "User transcript uploaded successfully. It will be used for study plan generation.",
     }
+
+
+@router.get("/{video_id}/study-plans", response_model=list[dict])
+async def get_video_study_plans(
+    video_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get all study plans for a video.
+
+    Args:
+        video_id: Video UUID
+
+    Returns:
+        List of study plans (overall + chunk-specific)
+    """
+    study_plan_repo = StudyPlanRepository(db)
+    study_plans = await study_plan_repo.get_all_by_video_id(video_id)
+
+    return [_transform_study_plan(sp) for sp in study_plans]
+
+
+@router.get("/{video_id}/study-plans/{chunk_index}", response_model=dict)
+async def get_study_plan_by_chunk(
+    video_id: UUID,
+    chunk_index: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get study plan for a specific chunk.
+
+    Args:
+        video_id: Video UUID
+        chunk_index: Index of the chunk (-1 for overall plan)
+
+    Returns:
+        Study plan for the chunk
+    """
+    study_plan_repo = StudyPlanRepository(db)
+
+    if chunk_index == -1:
+        study_plan = await study_plan_repo.get_by_video_id(video_id)
+    else:
+        study_plan = await study_plan_repo.get_by_video_and_chunk(video_id, chunk_index)
+
+    if not study_plan:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Study plan not found for video {video_id} chunk {chunk_index}",
+        )
+
+    return _transform_study_plan(study_plan)
+
+
+@router.patch("/{video_id}/study-plans/{chunk_index}", response_model=dict)
+async def update_study_plan_objective(
+    video_id: UUID,
+    chunk_index: int,
+    update_data: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    """Update a study plan objective (e.g., mark as completed).
+
+    Args:
+        video_id: Video UUID
+        chunk_index: Index of the chunk (-1 for overall plan)
+        update_data: Dictionary containing objective updates
+
+    Returns:
+        Updated study plan
+    """
+    study_plan_repo = StudyPlanRepository(db)
+
+    if chunk_index == -1:
+        study_plan = await study_plan_repo.get_by_video_id(video_id)
+    else:
+        study_plan = await study_plan_repo.get_by_video_and_chunk(video_id, chunk_index)
+
+    if not study_plan:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Study plan not found for video {video_id} chunk {chunk_index}",
+        )
+
+    if "objectives" in update_data:
+        study_plan.objectives = update_data["objectives"]
+    if "notes" in update_data:
+        study_plan.notes = update_data["notes"]
+
+    await study_plan_repo.save(study_plan)
+
+    return {
+        "id": str(study_plan.id),
+        "video_id": str(study_plan.video_id),
+        "chunk_index": study_plan.chunk_index,
+        "objectives": study_plan.objectives or [],
+        "vocabulary": study_plan.vocabulary or [],
+        "grammar": study_plan.grammar or [],
+        "notes": study_plan.notes,
+        "overall_difficulty": study_plan.overall_difficulty,
+        "estimated_time": study_plan.estimated_time,
+        "updated": True,
+    }
+
+
+@router.patch("/{video_id}/progress", response_model=ResumeInfo)
+async def update_progress(
+    video_id: UUID,
+    progress_data: StudyProgressUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    """Update video playback progress (chunk index and timestamp)."""
+    video_repo = VideoRepository(db)
+    progress_repo = ProgressRepository(db)
+
+    video = await video_repo.get_by_id(video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    video_id_str = str(video_id)
+
+    chunk_index = progress_data.chunk_index if progress_data.chunk_index is not None else 0
+    current_timestamp = (
+        progress_data.current_timestamp if progress_data.current_timestamp is not None else 0.0
+    )
+
+    progress = await progress_repo.get_by_video_and_chunk(video_id, chunk_index)
+
+    if progress:
+        if progress_data.current_timestamp is not None:
+            progress.current_timestamp = current_timestamp
+        if progress_data.completed is not None:
+            progress.completed = progress_data.completed
+    else:
+        progress = StudyProgress(
+            video_id=video_id_str,
+            chunk_index=chunk_index,
+            current_timestamp=current_timestamp,
+            completed=progress_data.completed or False,
+        )
+
+    await progress_repo.save(progress)
+
+    return ResumeInfo(
+        video_id=video_id,
+        chunk_index=chunk_index,
+        timestamp=current_timestamp,
+        sentence_index=None,
+    )
+
+
+@router.get("/{video_id}/progress", response_model=ResumeInfo | None)
+async def get_progress(
+    video_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get video playback progress for resuming."""
+    progress_repo = ProgressRepository(db)
+
+    video_repo = VideoRepository(db)
+    video = await video_repo.get_by_id(video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    chunk_repo = ChunkRepository(db)
+    chunks = await chunk_repo.get_by_video_id(video_id)
+
+    if not chunks:
+        return ResumeInfo(
+            video_id=video_id,
+            chunk_index=0,
+            timestamp=0.0,
+            sentence_index=None,
+        )
+
+    progress_list = await progress_repo.get_by_video_id(video_id)
+    if not progress_list:
+        return ResumeInfo(
+            video_id=video_id,
+            chunk_index=0,
+            timestamp=0.0,
+            sentence_index=None,
+        )
+
+    latest_progress = progress_list[-1]
+
+    resume_timestamp = max(0.0, latest_progress.current_timestamp - 3.0)
+
+    return ResumeInfo(
+        video_id=video_id,
+        chunk_index=latest_progress.chunk_index,
+        timestamp=resume_timestamp,
+        sentence_index=None,
+    )

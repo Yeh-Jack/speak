@@ -69,7 +69,6 @@ def setup_logging(log_level: str | None = None, verbose: bool | None = None) -> 
         handlers=_get_handlers(level, log_format),
     )
 
-    logging.getLogger("aiogram").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
 

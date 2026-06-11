@@ -1,29 +1,55 @@
+==========   Backend   ==========
 cd /workspaces/education/backend
 
-# 0. Install uv
+# 0. Install uv and initiate virtual environment.
+sudo apt update && sudo apt install -y ffmpeg
 curl -LsSf https://astral.sh/uv/install.sh | sh
+cd backend/
+uv venv
+source .venv/bin/activate
+uv pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu125
+uv pip install --force-reinstall --no-cache --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu130 llama-cpp-python
+uv sync
 
 # 1. Run tests.
 uv run pytest tests/unit/ -v
+curl -k https://192.168.1.109:8080/api/v1/llm/gpu-status - Returns GPU detection status and LLM configuration
+curl -k https://192.168.1.109:8080/api/v1/llm/llm-health - Forces model init and returns health + GPU status
+# --- 1 liner to test llama.cpp inferences by CPU or CUDA (execute in the backend folder)
+uv run python -c "from llama_cpp import Llama; model = Llama(model_path='../data/models/Qwen3.5-2B-Q4_K_M.gguf', n_gpu_layers=-1)"
 
 # 2. Start the backend server.
-uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# --- Add PROJECT_ROOT to serve frontend from the backend server.
+# --- Add --ssl-keyfile key.pem --ssl-certfile cert.pem to serve HTTPS which is required for MediaRecorder (use microphone).
+PROJECT_ROOT=/workspaces/speak uv run --python 3.12 uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload --ssl-keyfile key.pem --ssl-certfile cert.pem
+
 
 # 3. Get video information
-curl -X POST http://localhost:8000/api/v1/videos/info \
+curl -X POST http://localhost:8080/api/v1/videos/info \
   -H "Content-Type: application/json" \
   -d '{"youtube_url": "https://www.youtube.com/watch?v=SPGn9MZb1a0"}'
 
+Medusa : https://www.youtube.com/watch?v=3OSkg0JudmU
+Lilith : https://www.youtube.com/watch?v=Lf2UZXrFVtY
+House of the Dragon Season 3 : https://www.youtube.com/watch?v=i6w7O1kwuBk
+Toy Story 5 : https://www.youtube.com/watch?v=fh7MTAQGxEg
+RTX Spark : https://www.youtube.com/watch?v=H4nJo-oqAro
+NVIDIA GTC : https://www.youtube.com/watch?v=SPGn9MZb1a0
+
+Chat message:
+Which type is this movie (in Chinese)?
+Who is the main character (in English) ?
+
 # 4. Create video from YouTube (test with a short video)
-curl -X POST http://localhost:8000/api/v1/videos/youtube \
+curl -X POST http://localhost:8080/api/v1/videos/youtube \
   -H "Content-Type: application/json" \
-  -d '{"youtube_url": "https://www.youtube.com/watch?v=SPGn9MZb1a0", "chunk_duration": 30}'
+  -d '{"youtube_url": "https://www.youtube.com/watch?v=3OSkg0JudmU", "chunk_duration": 30}'
 
 # 5. List videos
-curl http://localhost:8000/api/v1/videos
+curl http://localhost:8080/api/v1/videos
 
 # 6. Delete video
-curl -X DELETE http://localhost:8000/api/v1/videos/{video_id}} \
+curl -X DELETE http://localhost:8080/api/v1/videos/{video_id}} \
   -H "Content-Type: application/json"
 
 This will:
@@ -33,22 +59,22 @@ This will:
 4. Return the complete video object
 
 # 7. Check video status
-curl http://localhost:8000/api/v1/videos/{video_id}
+curl http://localhost:8080/api/v1/videos/{video_id}
 
 # 8. Set video downloading status:
-curl -X PATCH "http://localhost:8000/api/v1/videos/{video_id}" \
+curl -X PATCH "http://localhost:8080/api/v1/videos/{video_id}" \
   -H "Content-Type: application/json" \
   -d '{"status": "chunking_complete"}'
 
 # 9. Retry downloading:
-curl -X POST "http://localhost:8000/api/v1/videos/{video_id}/retry"
+curl -X POST "https://192.168.1.109:8080/api/v1/videos/{video_id}/retry"
 
 # 10. Get video chunks
-curl http://localhost:8000/api/v1/videos/{video_id}/chunks
+curl http://localhost:8080/api/v1/videos/{video_id}/chunks
 
 # 11. Testing Chat API with curl
    A. Test non-streaming SSE (via curl):
-      curl -X POST http://localhost:8000/api/v1/chat \
+      curl -X POST http://localhost:8080/api/v1/chat \
         -H "Content-Type: application/json" \
         -d '{
           "messages": [
@@ -56,7 +82,7 @@ curl http://localhost:8000/api/v1/videos/{video_id}/chunks
           ]
         }'
    B. Test with video context (video_id optional):
-      curl -X POST http://localhost:8000/api/v1/chat \
+      curl -X POST http://localhost:8080/api/v1/chat \
         -H "Content-Type: application/json" \
         -d '{
           "video_id": "YOUR-UUID-HERE",
@@ -65,12 +91,12 @@ curl http://localhost:8000/api/v1/videos/{video_id}/chunks
           ]
         }'
    C. Test streaming with curl's -N (no buffer) for real-time tokens:
-curl -X POST http://localhost:8000/api/v1/chat \
+curl -k -X POST https://192.168.1.109:8080/api/v1/chat \
   -H "Content-Type: application/json" \
   -H "Accept: text/event-stream" \
   -d '{
     "messages": [
-      {"role": "user", "content": "Explain the word 'speculative'."}
+      {"role": "user", "content": "Explain the word 'speculative' in English."}
     ]
   }' -N
 
@@ -82,27 +108,44 @@ ls -la /workspaces/education/data/audios/      # Temp audio (deleted after Whisp
 
 # 9. Test Error Handling
 Submit invalid YouTube URL
-curl -X POST http://localhost:8000/api/v1/videos/youtube \
+curl -X POST http://localhost:8080/api/v1/videos/youtube \
   -H "Content-Type: application/json" \
   -d '{"youtube_url": "https://invalid-url.com/video"}'
 Check that status is failed and error_message is set:
 {"status": "failed", "error_message": "..."}
 
 # 10. Retry failed video
-curl -X POST http://localhost:8000/api/v1/videos/{video_id}/retry
+curl -X POST http://localhost:8080/api/v1/videos/{video_id}/retry
 
 # 11. Database Verification
 Check video status and error_message field:
 cd /workspaces/education
 sqlite3 data/db/learning.db "SELECT id, title, status, error_message FROM videos;"
 
-Issues :
+==========   Frontend   ==========
+cd frontend && pnpm dev to start the dev server.
+
+==========   Issues   ==========
 A. The prompt is too long and there's not enough room for the full processing / response.
    1. Max_tokens=8192
    2. Transcript is explicitly truncated to first 4000 characters
    3. Video length limit: ~3-5 minutes of content per study plan
 
-B. SSE (Server-Sent Events) - A server-push technology where the server sends data to the client over HTTP, one-way communication.
+B. NVIDIA driver installation notes:
+   1. Use newest NVIDIA driver.
+   2. Choose appropriate version of CUDA-tools-kit based on the GPU you have.
+      ex: CUDA-12.5 for Tesla P100.
+   3. Install the llama-cpp-python with the corresponding cuda (tools-kit) version.
+      ex: uv pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu125
+C. CUDA wheels for llama-cpp-python are typically built for Python 3.10–3.12
+    Python 3.14 = no prebuilt CUDA wheel available
+    So uv/pip silently falls back to CPU build from source
+    -----   Downgrade to 3.12 version   -----
+    uv python install 3.12
+    uv venv --python 3.12
+    uv pip install --force-reinstall --no-cache --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu130 llama-cpp-python
+    uv sync
+D. SSE (Server-Sent Events) - A server-push technology where the server sends data to the client over HTTP, one-way communication.
    Use case for this project:
     - The single HTTP request stays open and the server pushes data chunks through it. No new connection needed.
     - Backend sends tokens one-by-one as LLM generates them
@@ -118,40 +161,49 @@ B. SSE (Server-Sent Events) - A server-push technology where the server sends da
    The challenge: llama-cpp-python's create_chat_completion with stream=True is a blocking iterator
    that must run in a thread to avoid blocking the event loop.
 
-1. Main async code calls loop.run_in_executor to run _stream_tokens in thread pool
-2. _stream_tokens is a generator that yields tokens from the LLM
-3. The while loop continuously pulls tokens using _get_next (also run in executor)
-4. Tokens are yielded back to the async caller
-I'll create a simple ASCII/text diagram.
-┌─────────────────────────────────────────────────────────────┐
-│                      Async Caller                           │
-└─────────────────────┬───────────────────────────────────────┘
-                      │ yields token
-                      ▼
-┌─────────────────────────────────────────────────────────────┐
-│  while True:                                                │
-│    token = await loop.run_in_executor(None, _get_next, gen) │
-│    if token is None: break                                  │
-│    yield token                                              │
-└─────────────────────┬───────────────────────────────────────┘
-                      │ run in thread pool
-                      ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Thread Pool Executor (None = default)                      │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │  _get_next(gen)         _stream_tokens()               │ │
-│  │       │                        │                       │ │
-│  │       │                        ▼                       │ │
-│  │       │                 ┌──────────────┐               │ │
-│  │       │                 │  LLM Model   │               │ │
-│  │       │                 │  (blocking)  │               │ │
-│  │       │                 └──────┬───────┘               │ │
-│  │       │                        │                       │ │
-│  │       │◄───────── yields ──────┘                       │ │
-│  └───────┴────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
-Flow:
-1. _stream_tokens runs in thread pool, blocking on LLM
-2. _get_next pulls next token from generator (also in thread pool)
-3. Main loop runs in async context, yielding tokens to caller
-4. When StopIteration occurs, _get_next returns None → break
+  1. Main async code calls loop.run_in_executor to run _stream_tokens in thread pool
+  2. _stream_tokens is a generator that yields tokens from the LLM
+  3. The while loop continuously pulls tokens using _get_next (also run in executor)
+  4. Tokens are yielded back to the async caller
+  I'll create a simple ASCII/text diagram.
+  ┌─────────────────────────────────────────────────────────────┐
+  │                      Async Caller                           │
+  └─────────────────────┬───────────────────────────────────────┘
+                        │ yields token
+                        ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │  while True:                                                │
+  │    token = await loop.run_in_executor(None, _get_next, gen) │
+  │    if token is None: break                                  │
+  │    yield token                                              │
+  └─────────────────────┬───────────────────────────────────────┘
+                        │ run in thread pool
+                        ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │  Thread Pool Executor (None = default)                      │
+  │  ┌────────────────────────────────────────────────────────┐ │
+  │  │  _get_next(gen)         _stream_tokens()               │ │
+  │  │       │                        │                       │ │
+  │  │       │                        ▼                       │ │
+  │  │       │                 ┌──────────────┐               │ │
+  │  │       │                 │  LLM Model   │               │ │
+  │  │       │                 │  (blocking)  │               │ │
+  │  │       │                 └──────┬───────┘               │ │
+  │  │       │                        │                       │ │
+  │  │       │◄───────── yields ──────┘                       │ │
+  │  └───────┴────────────────────────────────────────────────┘ │
+  └─────────────────────────────────────────────────────────────┘
+  Flow:
+  1. _stream_tokens runs in thread pool, blocking on LLM
+  2. _get_next pulls next token from generator (also in thread pool)
+  3. Main loop runs in async context, yielding tokens to caller
+  4. When StopIteration occurs, _get_next returns None → break
+
+E. Browser requires HTTPS for MediaRecorder. getUserMedia requires a secure context (HTTPS or localhost).
+  # Generate self-signed certificate in backend directory
+  cd /workspaces/speak/backend
+  openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=192.168.1.109"
+
+# References
+1. llama-cpp-python (Python Bindings for llama.cpp)
+    https://github.com/abetlen/llama-cpp-python

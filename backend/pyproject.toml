@@ -1,20 +1,20 @@
 [project]
 name = "english-learning-backend"
 version = "0.1.0"
-description = "AI-powered English education platform backend"
-requires-python = ">=3.13"
+description = "AI-powered English learning platform backend"
+requires-python = "~=3.12.0"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "English Learning Team"}
+    {name = "Yeh-Jack"}
 ]
-keywords = ["fastapi", "llm", "education", "ai"]
+keywords = ["fastapi", "llm", "English", "learning", "ai"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Education",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.12",
     "Framework :: FastAPI",
 ]
 
@@ -30,8 +30,8 @@ dependencies = [
     "aiosqlite>=0.19.0",
     "alembic>=1.13.0",
     # LLM - llama-cpp-python with GPU support
-    # NVIDIA (CUDA): uv pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121
-    "llama-cpp-python>=0.3.23",
+    # NVIDIA (CUDA): uv pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu125
+    "llama-cpp-python>=0.3.28",
     # GPU detection - NVIDIA and AMD support
     "gputil>=1.4.0",
     "pyamdgpuinfo>=2.1.6; sys_platform == 'linux'",
@@ -50,6 +50,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "tenacity>=8.2.0",
     "orjson>=3.9.0",
+    "playwright>=1.60.0",
 ]
 
 [project.optional-dependencies]
@@ -69,8 +70,8 @@ test = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourorg/english-learning-app"
-Repository = "https://github.com/yourorg/english-learning-app"
+Homepage = "https://github.com/Yeh-Jack/speak"
+Repository = "https://github.com/Yeh-Jack/speak"
 
 [build-system]
 requires = ["hatchling"]
@@ -86,9 +87,9 @@ dev = [
 [tool.uv.pip]
 # Extra index URLs for GPU-accelerated packages
 extra-index-url = [
-    # Uncomment for NVIDIA GPU support
-    # "https://abetlen.github.io/llama-cpp-python/whl/cu121",
-    # Uncomment for AMD GPU support
+    # NVIDIA GPU support (CUDA 12.5)
+    "https://abetlen.github.io/llama-cpp-python/whl/cu125",
+    # AMD GPU support
     # "https://abetlen.github.io/llama-cpp-python/whl/rocm62",
 ]
 
@@ -121,7 +122,7 @@ ignore = [
 convention = "google"
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

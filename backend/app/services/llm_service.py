@@ -23,6 +23,11 @@ For each video, you will generate:
 4. Chunk study guides - detailed study material for each video segment
 5. Estimated study time
 
+IMPORTANT: All Chinese translations MUST be in TRADITIONAL Chinese (繁體中文) ONLY.
+- Do NOT use Simplified Chinese (簡體中文)
+- Do NOT mix in simplified characters
+- Use 繁體中文 characters only (如：學習、詞匯、影片，而不是 学习、词汇、电影)
+
 Only output the JSON response, no explanatory text."""
 
 
@@ -125,8 +130,10 @@ Generate a study plan in the following JSON format:
             "word_zh": "重要單詞或片語（繁體中文）",
             "definition": "clear English definition",
             "definition_zh": "清晰的中文定義",
-            "example": "example sentence using the word",
+            "example": "example sentence using the word (from the video transcript when possible)",
             "example_zh": "使用該詞的例句（繁體中文）",
+            "context": "the sentence from the video transcript where this word appears, showing real usage",
+            "context_zh": "該單詞在影片字幕中出現的句子，展示真實用法（繁體中文）",
             "difficulty": "easy|medium|hard",
             "difficulty_zh": "簡單|中等|困難"
         }}
@@ -157,9 +164,16 @@ Generate a study plan in the following JSON format:
     "notes_zh": "給學習者的額外教學筆記（繁體中文）"
 }}
 
-CRITICAL REQUIREMENT: Every text/string field in the JSON output MUST have a corresponding Chinese translation field with "_zh" suffix. This applies to ALL nested objects including vocabulary items, grammar items, and chunk objects. Do NOT omit any translation fields.
+IMPORTANT: Keep the output concise to avoid truncation.
+- vocabulary: Include ONLY 3 items maximum (choose the most important ones)
+- grammar: Include ONLY 2 items maximum
+- chunks: Include ONLY 1 chunk maximum (the first/most important one)
 
-Only return the JSON, no other text. Ensure the JSON is complete and valid."""
+CRITICAL REQUIREMENTS:
+1. Every text/string field in the JSON output MUST have a corresponding Chinese translation field with "_zh" suffix. This applies to ALL nested objects including vocabulary items, grammar items, and chunk objects. Do NOT omit any translation fields.
+2. ALL Chinese translations MUST be in TRADITIONAL Chinese (繁體中文) ONLY. Do NOT use Simplified Chinese (簡體中文). Examples: use 學習 not 学习, 詞匯 not 词汇, 影片 not 电影.
+
+Only return the JSON, no other text. Ensure the JSON is complete and valid. The JSON must be properly closed with all strings terminated."""
 
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -170,9 +184,7 @@ Only return the JSON, no other text. Ensure the JSON is complete and valid."""
         try:
             response = await self._generate_response(messages)
             study_plan = self._parse_json_response(response)
-            validated_plan = self._validate_study_plan(
-                study_plan, video_title, video_duration
-            )
+            validated_plan = self._validate_study_plan(study_plan, video_title, video_duration)
             timings["llm_inference_seconds"] = time.perf_counter() - inference_start
             logger.info(
                 f"[LLM Timing] init={timings['llm_init_seconds']:.2f}s, "
@@ -291,16 +303,67 @@ Only return the JSON, no other text. Ensure the JSON is complete and valid."""
                     return json.loads(json_str)
                 except json.JSONDecodeError:
                     pass
-            logger.warning(
-                f"Failed to parse LLM response: {e}, response length: {len(response)}"
-            )
+            truncated_json = self._fix_truncated_json(response)
+            if truncated_json:
+                return truncated_json
+            logger.warning(f"Failed to parse LLM response: {e}, response length: {len(response)}")
             logger.warning(f"Raw LLM response (first 1000 chars): {response[:1000]}")
             logger.warning(f"Raw LLM response (last 500 chars): {response[-500:]}")
             raise
 
-    def _validate_study_plan(
-        self, plan: dict, video_title: str, video_duration: float
-    ) -> dict:
+    def _fix_truncated_json(self, response: str) -> dict | None:
+        """Attempt to fix JSON truncated mid-string.
+
+        When LLM output is cut off mid-string (e.g., "difficulty": "medium
+        without closing quote), finds the last valid JSON boundary and truncates there.
+        """
+        msg = str(response)
+
+        # Case 1: Odd number of quotes suggests an unclosed string
+        quote_count = msg.count('"')
+        if quote_count % 2 != 0:
+            # Find the last unclosed quote
+            last_quote = msg.rfind('"')
+            if last_quote > len(msg) // 2:
+                # Truncate at the unclosed quote
+                truncated = msg[:last_quote]
+                # Try to find a valid JSON end
+                last_brace = truncated.rfind("}") + 1
+                if last_brace > 0:
+                    truncated = truncated[:last_brace]
+                    try:
+                        result = json.loads(truncated)
+                        logger.info(f"Fixed truncated JSON by truncating at unclosed string (char {last_quote})")
+                        return result
+                    except json.JSONDecodeError:
+                        pass
+
+        # Case 2: Try to find the last complete object (look for },])
+        last_valid_end = msg.rfind("}")
+        if last_valid_end > 0:
+            truncated = msg[:last_valid_end + 1]
+            try:
+                result = json.loads(truncated)
+                logger.info(f"Fixed truncated JSON by truncating at last complete object (char {last_valid_end})")
+                return result
+            except json.JSONDecodeError:
+                pass
+
+        # Case 3: Look for last complete entry in arrays
+        for search_str in [']}}', ']}', '"]', '}]']:
+            last_idx = msg.rfind(search_str)
+            if last_idx > len(msg) // 2:
+                truncated = msg[:last_idx + len(search_str)]
+                try:
+                    result = json.loads(truncated)
+                    logger.info(f"Fixed truncated JSON by truncating at '{search_str}' (char {last_idx})")
+                    return result
+                except json.JSONDecodeError:
+                    pass
+
+        return None
+
+    def _validate_study_plan(self, plan: dict, video_title: str, video_duration: float) -> dict:
         """Validate and fill in missing fields with defaults."""
         vocabulary = []
         for item in plan.get("vocabulary", []):
@@ -311,6 +374,8 @@ Only return the JSON, no other text. Ensure the JSON is complete and valid."""
                 "definition_zh": item.get("definition_zh", ""),
                 "example": item.get("example", ""),
                 "example_zh": item.get("example_zh", ""),
+                "context": item.get("context", ""),
+                "context_zh": item.get("context_zh", ""),
                 "difficulty": item.get("difficulty", "medium"),
                 "difficulty_zh": item.get("difficulty_zh", "中等"),
             }

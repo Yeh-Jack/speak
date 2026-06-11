@@ -310,28 +310,6 @@ class TranscriptionService:
                     return entries
         return None
 
-    async def _transcribe_with_whisper(self, video_path: Path, language: str) -> List[dict]:
-        """Transcribe video audio using Whisper (legacy method for compatibility)."""
-        return await self.transcribe_with_whisper(video_path, language)
-
-    async def transcribe(
-        self,
-        video_path: Path,
-        subtitle_paths: list[str] | None = None,
-        language: str = "en",
-    ) -> List[dict]:
-        """Transcribe video (legacy method - use get_dual_transcripts instead).
-
-        Args:
-            video_path: Path to video file
-            subtitle_paths: Optional list of pre-downloaded subtitle file paths
-            language: Language code (default: en)
-
-        Returns:
-            Whisper transcript entries (for backward compatibility)
-        """
-        return await self.transcribe_with_whisper(video_path, language)
-
     async def _extract_audio(self, video_path: Path) -> Path:
         """Extract audio from video using FFmpeg."""
         audio_path = self.audios_dir / f"{video_path.stem}_audio.wav"

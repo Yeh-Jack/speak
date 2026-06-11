@@ -26,6 +26,7 @@ class StudyPlan(Base, TimestampMixin):
     vocabulary: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     grammar: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    notes_zh: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     overall_difficulty: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     estimated_time: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 

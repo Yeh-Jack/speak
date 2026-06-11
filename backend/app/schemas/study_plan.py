@@ -23,6 +23,7 @@ class StudyPlanCreate(StudyPlanBase):
     vocabulary: list[dict] = []
     grammar: list[str] = []
     notes: str | None = None
+    notes_zh: str | None = None
 
 
 class StudyPlanUpdate(BaseModel):
@@ -36,6 +37,7 @@ class StudyPlanUpdate(BaseModel):
     vocabulary: list[dict] | None = None
     grammar: list[str] | None = None
     notes: str | None = None
+    notes_zh: str | None = None
 
 
 class StudyPlan(StudyPlanBase):
@@ -51,11 +53,5 @@ class StudyPlan(StudyPlanBase):
     vocabulary: list[dict]
     grammar: list[str]
     notes: str | None
+    notes_zh: str | None
     created_at: datetime
-    updated_at: datetime
-
-
-class StudyPlanInDB(StudyPlan):
-    """Study plan schema with internal fields."""
-
-    pass
