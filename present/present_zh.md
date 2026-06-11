@@ -1,10 +1,8 @@
-# English Speaking Learning App - Project Presentation
-
-## 英文口說學習系統 - 專案簡報
+# 英文口說學習系統 - 專案簡報
 
 ---
 
-## Slide 1: Cover Page (封面)
+## 投影片 1：封面
 
 ```
 ╔═══════════════════════════════════════════════════════════════╗
@@ -14,255 +12,257 @@
 ║                                                               ║
 ║  ─────────────────────────────────────────────────────────────║
 ║                                                               ║
-║  Project Type: Full-Stack AI Application                     ║
-║  Target: 個人英語學習者             ║
+║  專案類型：全端 AI 應用程式                                    ║
+║  目標：個人英語學習者                                          ║
 ║                                                               ║
 ╚═══════════════════════════════════════════════════════════════╝
 ```
 
-**Suggested Visual**: App logo, screenshot of video player with subtitles, AI chat interface
-
 ---
 
-## Slide 2: Motivation & Problem Statement (動機與問題)
+## 投影片 2：動機與問題陳述
 
-### Why This Project?
+### 為什麼要做這個專案？
+
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  製作動機                                             │
+│  製作動機                                                       │
 ├────────────────────────────────────────────────────────────────┤
 │                                                                │
-│  ✅ 嘗試製作一個具有AI功能的應用程式                                 │
-│  ✅ 利用 AI 作為個人化的英語老師                                  │
-│  ✅ 從 YouTube 影片中學習（電影、TED、影集）                     │
-│  ✅ AI 自動生成個人化學習計劃和詞彙表                             │
-│  ✅ 口說練習功能                                             │
+│  ✅ 嘗試製作一個具有 AI 功能的應用程式                            │
+│  ✅ 利用 AI 作為個人化的英語老師                                │
+│  ✅ 從 YouTube 影片中學習（電影、TED、影集）                    │
+│  ✅ AI 自動生成個人化學習計劃和詞彙表                            │
+│  ✅ 口說練習功能                                                 │
 └────────────────────────────────────────────────────────────────┘
 ```
 
-### How to Build an AI-Enabled Python Application
+### 如何建構 AI 賦能的 Python 應用程式
+
 ```
                      ┌─────────────────┐
-                     │   User Submit   │
-                     │  YouTube URL    │
+                     │   使用者提交     │
+                     │  YouTube 網址   │
                      └────────┬────────┘
                               │
                               ▼
 ┌──────────────────────────────────────────────────────────────┐
-│                    AI Application Architecture                │
+│                    AI 應用程式架構                             │
 │                                                              │
-│  1. Video Ingestion  ──►  2. AI Processing  ──►  3. Output │
-│     (yt-dlp)              (Whisper + LLM)            (Study  │
-│                                                        Plan) │
+│  1. 影片攝取  ──►  2. AI 處理  ──►  3. 輸出                  │
+│     (yt-dlp)          (Whisper + LLM)            (學習計劃)   │
 │                                                              │
-│  Key Technologies:                                           │
-│  • llama-cpp-python - Embedded LLM (no API costs)            │
-│  • faster-whisper - Speech-to-text transcription             │
-│  • async/await - Non-blocking processing                     │
+│  關鍵技術：                                                   │
+│  • llama-cpp-python - 嵌入式 LLM（無 API 費用）              │
+│  • faster-whisper - 語音轉文字逐字稿                          │
+│  • async/await - 非阻塞處理                                   │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-**Speaker Notes**: 說明如何用 Python 建構 AI 應用程式，重點在於 llama-cpp-python 的使用讓我們不需要支付 API 費用，可以在本地端運行 LLM。
+**演講者備註**：說明如何用 Python 建構 AI 應用程式，重點在於 llama-cpp-python 的使用讓我們不需要支付 API 費用，可以在本地端運行 LLM。
 
 ---
 
-## Slide 3: Demo / Live Preview (展示環節)
+## 投影片 3：展示環節
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│                      LIVE DEMO                                 │
+│                      現場展示                                   │
 ├────────────────────────────────────────────────────────────────┤
 │                                                                │
-│  1. Submit a YouTube URL                                       │
+│  1. 提交 YouTube 網址                                          │
 │     → https://www.youtube.com/watch?v=3OSkg0JudmU                 │
 │                                                                │
-│  2. i18n            │
+│  2. i18n                       │
 │                                                                │
-│  3. View generated content                                     │
-│     □ Study plan with vocabulary                               │
-│     □ Grammar points                                           │
-│     □ Chunk summaries                                          │
+│  3. 檢視生成的內容                                              │
+│     □ 含詞彙的學習計劃                                         │
+│     □ 語法重點                                                 │
+│     □ 分段摘要                                                 │
 │                                                                │
-│  4. Interactive learning                                       │
-│     □ Video player with synced subtitles                      │
-│     □ Vocabulary highlighting                                   │
-│     □ Listening mode (audio only)                              │
+│  4. 互動式學習                                                 │
+│     □ 帶同步字幕的影片播放器                                   │
+│     □ 詞彙醒目提示                                             │
+│     □ 純聽力模式（僅音訊）                                      │
 │                                                                │
-│  5. Speaking practice                                         │
-│     □ Record pronunciation                                      │
-│     □ Compare with original                                    │
-│     □ AI feedback                                              │
+│  5. 口說練習                                                   │
+│     □ 錄製發音                                                 │
+│     □ 與原始音訊比較                                           │
+│     □ AI 回饋                                                  │
 │                                                                │
-│  6. Chat with AI teacher                                      │
-│     □ Ask questions about vocabulary                           │
-│     □ Get explanations in Traditional Chinese                  │
+│  6. 與 AI 導師聊天                                             │
+│     □ 詢問詞彙相關問題                                         │
+│     □ 以繁體中文取得說明                                       │
 │                                                                │
 └────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Slide 4: Tech Stack Overview (技術堆疊)
+## 投影片 4：技術堆疊
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        TECH STACK                               │
+│                        技術堆疊                                  │
 ├───────────────┬─────────────────────────────────────────────────┤
-│   FRONTEND          │  Vue 3.5 + TypeScript + Vite + pnpm      │
-│                     │  Pinia (State Management)                 │
+│   前端              │  Vue 3.5 + TypeScript + Vite + pnpm       │
+│                     │  Pinia（狀態管理）                         │
 │                     │  Tailwind CSS                              │
 ├─────────────────────┼─────────────────────────────────────────┤
-│   BACKEND           │  FastAPI (Python 3.12)                   │
-│                     │  SQLAlchemy 2.0 (Async)                   │
-│                     │  Pydantic v2                              │
+│   後端              │  FastAPI（Python 3.12）                    │
+│                     │  SQLAlchemy 2.0（非同步）                  │
+│                     │  Pydantic v2                               │
 ├─────────────────────┼─────────────────────────────────────────┤
-│   DATABASE          │  SQLite3 (WAL mode)                      │
-│                     │  learning.db                              │
+│   資料庫            │  SQLite3（WAL 模式）                       │
+│                     │  learning.db                               │
 ├─────────────────────┼─────────────────────────────────────────┤
 │   AI/ML             │  llama-cpp-python                        │
 │                     │  Qwen3.5-2B-Q4_K_M.gguf                    │
-│                     │  faster-whisper (Whisper Tiny)            │
+│                     │  faster-whisper（Whisper Tiny）           │
 ├─────────────────────┼─────────────────────────────────────────┤
-│   VIDEO             │  FFmpeg + yt-dlp                         │
-│                     │  WebM/MP4 (720p)                          │
+│   影片              │  FFmpeg + yt-dlp                         │
+│                     │  WebM/MP4（720p）                         │
 ├─────────────────────┼─────────────────────────────────────────┤
-│   INFRASTRUCTURE    │  uv (Package Manager)                    │
-│                     │  GPUtil (NVIDIA GPU detection)            │
+│   基礎設施          │  uv（套件管理器）                          │
+│                     │  GPUtil（NVIDIA GPU 偵測）                  │
 └─────────────────────┴─────────────────────────────────────────┘
 ```
 
-### Why These Choices?
+### 為什麼選擇這些技術？
+
 ```
 ┌────────────────────────────────────────────────────────────────┐
 │  選擇 FastAPI 的原因                                            │
 │  • 原生支援 async/await                                         │
-│  • 自動 OpenAPI 文件                                           │
+│  • 自動產生 OpenAPI 文件                                        │
 │  • Pydantic 整合                                                │
 │                                                                │
 │  選擇 llama-cpp-python 的原因                                   │
 │  • 本地運行，無 API 費用                                        │
 │  • 支援 NVIDIA CUDA 加速                                       │
-│  • Q4_K_M 量化，2B 模型只需 ~1.5GB RAM                          │
+│  • Q4_K_M 量化，2B 模型只需約 1.5GB RAM                         │
 └────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Slide 5: System Architecture (系統架構)
+## 投影片 5：系統架構
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         SYSTEM ARCHITECTURE                              │
+│                         系統架構                                        │
 │                                                                         │
 │  ┌───────────────────────────────────────────────────────────────────┐  │
-│  │                        Frontend (Vue 3.5)                          │  │
+│  │                        前端（Vue 3.5）                             │  │
 │  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────────────────┐ │  │
-│  │  │  Home   │  │  Video  │  │ Speaking│  │   Chat with AI      │ │  │
-│  │  │  Page   │  │  Player │  │ Practice│  │     Teacher         │ │  │
+│  │  │  首頁   │  │  影片   │  │  口說   │  │   與 AI 導師         │ │  │
+│  │  │         │  │ 播放器 │  │  練習   │  │   聊天              │ │  │
 │  │  └────┬────┘  └────┬────┘  └────┬────┘  └──────────┬──────────┘ │  │
 │  └───────┼────────────┼────────────┼────────────────────┼─────────────┘  │
 │          │            │            │                    │               │
 │          └────────────┴────────────┴────────────────────┘               │
-│                               │                                          │
-│                          REST API │                                      │
-│                               │                                          │
+│                               │                                        │
+│                          REST API │                                    │
+│                               │                                        │
 │  ┌────────────────────────────┴──────────────────────────────────────┐  │
-│  │                    Backend (FastAPI) - Async I/O                    │  │
+│  │                    後端（FastAPI）- 非同步 I/O                       │  │
 │  │  ┌───────────┐  ┌───────────┐  ┌───────────┐  ┌─────────────────┐  │  │
-│  │  │   Video   │  │    LLM    │  │ Transcript│  │     Study      │  │  │
-│  │  │  Service  │  │  Service  │  │  Service  │  │    Service      │  │  │
+│  │  │   影片    │  │    LLM    │  │  逐字稿   │  │     學習        │  │  │
+│  │  │  服務     │  │   服務    │  │   服務    │  │     服務        │  │  │
 │  │  └─────┬─────┘  └─────┬─────┘  └─────┬─────┘  └────────┬────────┘  │  │
 │  └────────┼──────────────┼──────────────┼─────────────────┼───────────┘  │
 │           │              │              │                  │             │
 │           ▼              ▼              ▼                  ▼             │
 │  ┌────────────────┐         ┌────────────────────────────┐             │
-│  │    SQLite3      │         │  llama-cpp-python + GPUtil  │             │
-│  │  learning.db    │         │    (Qwen3.5-2B-Q4_K_M)      │             │
+│  │    SQLite3     │         │  llama-cpp-python + GPUtil  │             │
+│  │  learning.db   │         │    (Qwen3.5-2B-Q4_K_M)      │             │
 │  └────────────────┘         └────────────────────────────┘             │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Key Design Decisions
+### 關鍵設計決策
+
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  📌 No Authentication - Single-user application                │
-│  📌 No Background Queue - All operations are async/await        │
-│  📌 Single Fixed LLM Model - Qwen3.5-2B-Q4_K_M.gguf            │
-│  📌 YouTube Only - No local file uploads                        │
+│  📌 無需認證 - 單一用戶應用程式                                   │
+│  📌 無背景佇列 - 所有操作皆為非同步處理                           │
+│  📌 單一固定 LLM 模型 - Qwen3.5-2B-Q4_K_M.gguf                  │
+│  📌 僅支援 YouTube - 不支援本機檔案上傳                          │
 └────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Slide 6: Processing Pipeline (處理流程)
+## 投影片 6：處理流程
 
 ```
 POST /api/videos/youtube
             │
             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ Step 1: Download (yt-dlp)                                    │
+│ 步驟 1：下載（yt-dlp）                                        │
 │ ──────────────────────────────────────────────────────────── │
-│ • Download video (MP4/WebM, 720p)                            │
-│ • Download YouTube subtitles simultaneously                  │
-│ • Extract video metadata (title, uploader, thumbnail)       │
+│ • 下載影片（MP4/WebM，720p）                                 │
+│ • 同時下載 YouTube 字幕                                      │
+│ • 擷取影片中繼資料（標題、上傳者、縮圖）                       │
 │                                                             │
-│ Checkpoint: pending → downloading → downloading_complete    │
+│ 檢查點：pending → downloading → downloading_complete        │
 └─────────────────────────────┬───────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ Step 2: Transcription (Whisper - Always Runs)               │
+│ 步驟 2：語音轉文字（Whisper - 必定執行）                       │
 │ ──────────────────────────────────────────────────────────── │
-│ • Extract audio using FFmpeg                                 │
-│ • Run faster-whisper (Tiny model for speed)                 │
-│ • Store: youtube_author, youtube_auto, whisper transcripts  │
+│ • 使用 FFmpeg 擷取音訊                                       │
+│ • 執行 faster-whisper（使用 Tiny 模型以提升速度）             │
+│ • 儲存：youtube_author、youtube_auto、whisper 逐字稿         │
 │                                                             │
-│ Checkpoint: downloading_complete → transcribing → complete  │
+│ 檢查點：downloading_complete → transcribing → complete       │
 └─────────────────────────────┬───────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ Step 3: Chunking (Hybrid Dynamic + Sentence Snap)           │
+│ 步驟 3：分段（混合動態 + 句子對齊）                           │
 │ ──────────────────────────────────────────────────────────── │
-│ • Calculate ~5-min segments                                 │
-│ • Search ±30s for nearest sentence boundary (., !, ?)       │
-│ • Snap to full sentence boundaries                          │
-│ • Virtual chunks - use original video with timestamps       │
+│ • 計算約 5 分鐘的分段                                         │
+│ • 在範圍 ±30 秒內搜尋最近的句子邊界（.、!、?）               │
+│ • 對齊至完整句子邊界                                         │
+│ • 虛擬分塊 - 使用原始影片搭配時間戳記                         │
 │                                                             │
-│ Checkpoint: transcribing_complete → chunking → complete     │
+│ 檢查點：transcribing_complete → chunking → complete        │
 └─────────────────────────────┬───────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ Step 4: Audio Extraction (FFmpeg)                            │
+│ 步驟 4：音訊擷取（FFmpeg）                                    │
 │ ──────────────────────────────────────────────────────────── │
-│ • Extract MP3 audio per chunk                               │
-│ • 128kbps, for listening-only mode                         │
-│ • Stored at data/audios/{video_id}/chunk_{n}.mp3           │
+│ • 為每個分塊擷取 MP3 音訊                                    │
+│ • 128kbps，用於純聽力模式                                    │
+│ • 儲存於 data/audios/{video_id}/chunk_{n}.mp3              │
 └─────────────────────────────┬───────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ Step 5: Study Plan Generation (LLM)                         │
+│ 步驟 5：學習計劃生成（LLM）                                   │
 │ ──────────────────────────────────────────────────────────── │
-│ • Select highest priority transcript:                       │
-│   user > youtube_author > whisper > youtube_auto            │
-│ • Generate: vocabulary, grammar, study objectives           │
-│ • All Chinese in Traditional Chinese (繁體中文)             │
+│ • 選擇最高優先級的逐字稿：                                   │
+│   使用者上傳 > youtube_author > whisper > youtube_auto      │
+│ • 生成：詞彙、語法、學習目標                                  │
+│ • 所有中文內容使用繁體中文                                    │
 │                                                             │
-│ Checkpoint: audio_extracted → studying → ready             │
+│ 檢查點：audio_extracted → studying → ready                  │
 └─────────────────────────────┬───────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    Return Complete Video Object              │
-│  • Video metadata        • Chunks with timestamps          │
-│  • Transcripts           • Study plan with vocabulary       │
+│                    回傳完整的影片物件                         │
+│  • 影片中繼資料        • 帶時間戳記的分塊                      │
+│  • 逐字稿             • 含詞彙的學習計劃                      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Checkpoint-Resume State Machine
+### 檢查點恢復狀態機
+
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │  pending ──► downloading ──► downloading_complete            │
@@ -289,17 +289,18 @@ POST /api/videos/youtube
 
 ---
 
-## Slide 7: Key Code Snippets - LLM Service (重點程式碼 - LLM 服務)
+## 投影片 7：重點程式碼 - LLM 服務
 
-### LLM Service Initialization
+### LLM 服務初始化
+
 ```python
 # app/services/llm_service.py
 
 class LLMService:
-    """Service for LLM inference using llama-cpp-python."""
+    """使用 llama-cpp-python 進行 LLM 推論的服務。"""
     
     def _ensure_model(self) -> None:
-        """Lazy load the llama-cpp-python model."""
+        """延遲載入 llama-cpp-python 模型。"""
         if self._initialized:
             return
         
@@ -318,7 +319,8 @@ class LLMService:
         self._initialized = True
 ```
 
-### Study Plan Generation
+### 學習計劃生成
+
 ```python
     async def generate_study_plan(
         self,
@@ -326,7 +328,7 @@ class LLMService:
         video_title: str,
         video_duration: float,
     ) -> tuple[dict[str, Any], dict[str, float]]:
-        """Generate a study plan from transcript using LLM."""
+        """使用 LLM 從逐字稿生成學習計劃。"""
         
         transcript_text = self._format_transcript_for_prompt(transcript)
         
@@ -346,54 +348,54 @@ class LLMService:
         return self._parse_json_response(response)
 ```
 
-**Speaker Notes**: 說明我們如何使用 llama-cpp-python 的 GPU 自動檢測功能，以及 Lazy loading 模式如何節省資源。
+**演講者備註**：說明我們如何使用 llama-cpp-python 的 GPU 自動偵測功能，以及延遲載入模式如何節省資源。
 
 ---
 
-## Slide 8: Problems Encountered & Solutions (問題與解決方案)
+## 投影片 8：問題與解決方案
 
-### Problem 1: CUDA Support & Python Version (CUDA 支援與 Python 版本)
+### 問題 1：CUDA 支援與 Python 版本
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  🔴 PROBLEM                                                     │
+│  🔴 問題                                                        │
 │  ────────────────────────────────────────────────────────────  │
-│  llama-cpp-python with CUDA support requires specific Python   │
-│  versions 3.10 ~ 3.12. Python 3.13+ is NOT supported.          │
+│  llama-cpp-python 搭配 CUDA 支援需要特定的 Python 版本         │
+│  Python 3.10 ~ 3.12。Python 3.13+ 不支援。                      │
 └────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌────────────────────────────────────────────────────────────────┐
-│  ✅ SOLUTION                                                    │
+│  ✅ 解決方案                                                     │
 │  ────────────────────────────────────────────────────────────  │
-│  1. Use Python 3.12 as the required version                    │
-│  2. Set LLM_GPU_LAYERS=0 for CPU-only mode on Python 3.13+    │
-│  3. Add runtime detection and graceful fallback                │
+│  1. 使用 Python 3.12 作為必要版本                              │
+│  2. 在 Python 3.13+ 上設定 LLM_GPU_LAYERS=0 以使用 CPU 模式     │
+│  3. 新增執行期偵測和優雅降級                                    │
 └────────────────────────────────────────────────────────────────┘
 ```
 
-### Problem 2: Audio Recording from Browser (瀏覽器音頻錄製)
+### 問題 2：瀏覽器音訊錄製
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  🔴 PROBLEM                                                     │
+│  🔴 問題                                                        │
 │  ────────────────────────────────────────────────────────────  │
-│  Browsers require HTTPS for microphone access via MediaRecorder│
-│  API. Development servers using HTTP will fail silently.       │
+│  瀏覽器需要 HTTPS 才能透過 MediaRecorder API 存取麥克風。       │
+│  使用 HTTP 的開發伺服器會無聲失敗。                              │
 │                                                                │
-│  Error: "getUserMedia() not available on insecure origins"     │
+│  錯誤：「getUserMedia() 在不安全來源上不可用」                   │
 └────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌────────────────────────────────────────────────────────────────┐
-│  ✅ SOLUTION                                                    │
+│  ✅ 解決方案                                                     │
 │  ────────────────────────────────────────────────────────────  │
-│  1. Generate self-signed SSL certificate for development       │
-│  2. Configure uvicorn with SSL                                 │
-│  3. Update CORS settings for HTTPS                             │
-│  4. OR use ngrok.                             │
+│  1. 為開發環境產生自簽 SSL 憑證                                 │
+│  2. 使用 SSL 設定 uvicorn                                      │
+│  3. 更新 CORS 設定以支援 HTTPS                                  │
+│  4. 或使用 ngrok                                                │
 │                                                                │
-│  Commands:                                                     │
+│  指令：                                                         │
 │  openssl req -x509 -newkey rsa:2048 \                          │
 │      -keyout key.pem -out cert.pem \                          │
 │      -days 365 -nodes -subj "/CN=YOUR_HOST"                    │
@@ -401,53 +403,51 @@ class LLMService:
 │  uvicorn app.main:app --ssl-keyfile key.pem \                 │
 │                  --ssl-certfile cert.pem                      │
 │                                                                │
-│  Note: For production, use proper SSL certificates             │
+│  備註：生產環境請使用正式的 SSL 憑證                            │
 └────────────────────────────────────────────────────────────────┘
 ```
 
-### Problem 3: Traditional Chinese Support (繁體中文支援)
+### 問題 3：繁體中文支援
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  🔴 PROBLEM                                                     │
+│  🔴 問題                                                        │
 │  ────────────────────────────────────────────────────────────  │
-│  LLM may generate Simplified Chinese instead of Traditional   │
-│  Chinese. Need consistent Traditional Chinese throughout.     │
+│  LLM 可能會生成簡體中文而非繁體中文。需要一致的繁體中文。        │
 └────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌────────────────────────────────────────────────────────────────┐
-│  ✅ SOLUTION                                                    │
+│  ✅ 解決方案                                                     │
 │  ────────────────────────────────────────────────────────────  │
-│  Add explicit instruction in system prompt:                 │
+│  在系統提示中加入明確指示：                                     │
 │                                                                │
-│  IMPORTANT: All Chinese translations MUST be in                │
-│  TRADITIONAL Chinese (繁體中文) ONLY.                          │
-│  Examples: 學習 not 学习, 詞匯 not 词汇                         │
+│  重要：所有中文翻譯必須僅使用繁體中文。                          │
+│  範例：學習 不是 学习，詞匯 不是 词汇                           │
 └────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Slide 9: Future Enhancements (未來改進)
+## 投影片 9：未來改進
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│                    FUTURE ENHANCEMENTS                          │
+│                    未來改進                                      │
 ├────────────────────────────────────────────────────────────────┤
 │                                                                │
-│  □ Model upgrades (larger LLM for better study plans)          │
-│  □ Multi-language support beyond Chinese/English               │
-│  □ Improved pronunciation feedback with advanced ASR           │
-│  □ Docker Compose for easy deployment                         │
-│  □ Multi-user support with authentication                     │
+│  □ 模型升級（更大的 LLM 以獲得更好的學習計劃）                  │
+│  □ 支援中文/英文以外的多語言                                    │
+│  □ 使用進階 ASR 改善發音回饋                                   │
+│  □ Docker Compose 簡化部署                                    │
+│  □ 多用戶支援與認證                                            │
 │                                                                │
 └────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Slide 10: Q&A (問答時間)
+## 投影片 10：問答時間
 
 ```
 ╔═══════════════════════════════════════════════════════════════╗
@@ -460,7 +460,7 @@ class LLMService:
 
 ---
 
-## Slide 11: Thank You (感謝聆聽)
+## 投影片 11：感謝聆聽
 
 ```
 ╔═══════════════════════════════════════════════════════════════╗
@@ -470,8 +470,8 @@ class LLMService:
 ║                                                               ║
 ║  ───────────────────────────────────────────────────────────  ║
 ║                                                               ║
-│     □ GitHub: https://github.com/Yeh-Jack/speak.git        │
-│     □ Demo: https://unshaven-travesty-luckless.ngrok-free.dev │
+│     □ GitHub：https://github.com/Yeh-Jack/speak.git           │
+│     □ 展示：https://unshaven-travesty-luckless.ngrok-free.dev │
 ║                                                               ║
 ╚═══════════════════════════════════════════════════════════════╝
 ```

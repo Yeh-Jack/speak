@@ -13,13 +13,16 @@ uv sync
 
 # 1. Run tests.
 uv run pytest tests/unit/ -v
-curl http://localhost:8080/api/v1/llm/gpu-status - Returns GPU detection status and LLM configuration
-curl http://localhost:8080/api/v1/llm/llm-health - Forces model init and returns health + GPU status
+curl -k https://192.168.1.109:8080/api/v1/llm/gpu-status - Returns GPU detection status and LLM configuration
+curl -k https://192.168.1.109:8080/api/v1/llm/llm-health - Forces model init and returns health + GPU status
+# --- 1 liner to test llama.cpp inferences by CPU or CUDA (execute in the backend folder)
+uv run python -c "from llama_cpp import Llama; model = Llama(model_path='../data/models/Qwen3.5-2B-Q4_K_M.gguf', n_gpu_layers=-1)"
 
 # 2. Start the backend server.
 # --- Add PROJECT_ROOT to serve frontend from the backend server.
 # --- Add --ssl-keyfile key.pem --ssl-certfile cert.pem to serve HTTPS which is required for MediaRecorder (use microphone).
 PROJECT_ROOT=/workspaces/speak uv run --python 3.12 uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload --ssl-keyfile key.pem --ssl-certfile cert.pem
+
 
 # 3. Get video information
 curl -X POST http://localhost:8080/api/v1/videos/info \
@@ -88,12 +91,12 @@ curl http://localhost:8080/api/v1/videos/{video_id}/chunks
           ]
         }'
    C. Test streaming with curl's -N (no buffer) for real-time tokens:
-curl -X POST http://localhost:8080/api/v1/chat \
+curl -k -X POST https://192.168.1.109:8080/api/v1/chat \
   -H "Content-Type: application/json" \
   -H "Accept: text/event-stream" \
   -d '{
     "messages": [
-      {"role": "user", "content": "Explain the word 'speculative'."}
+      {"role": "user", "content": "Explain the word 'speculative' in English."}
     ]
   }' -N
 
