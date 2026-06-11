@@ -289,25 +289,42 @@ POST /api/videos/youtube
 
 ---
 
-## Slide 7: Key Code Snippets - LLM Service (重點程式碼 - LLM 服務)
+## Slide 7: Key Code Snippets - Whisper Transcription Service
+```python
+# app/services/transcription_service.py
 
-### LLM Service Initialization
+class WhisperTranscriptionService:
+    """Service for transcribing audio using faster-whisper."""
+    def _load_model(self):
+        from faster_whisper import WhisperModel
+        self._model = WhisperModel(
+            self.model_size, # Model sizes: tiny, base, small, medium, large-v3
+            device="cpu",
+            compute_type="int8",
+            cpu_threads=4,
+        )
+
+    async def transcribe(...) -> List[dict]:
+        self._load_model()
+        segments, info = await asyncio.to_thread(
+            lambda: self._model.transcribe(
+                str(audio_path),
+                language=language, # 'en' here.
+                word_timestamps=word_timestamps,
+                vad_filter=True,
+                vad_parameters=dict(min_silence_duration_ms=500),
+            ),
+        )
+```
+
+## Slide 8: Key Code Snippets - LLM Service Initialization
 ```python
 # app/services/llm_service.py
 
 class LLMService:
     """Service for LLM inference using llama-cpp-python."""
-    
     def _ensure_model(self) -> None:
-        """Lazy load the llama-cpp-python model."""
-        if self._initialized:
-            return
-        
-        env_gpu_layers = os.getenv("LLM_GPU_LAYERS", settings.LLM_GPU_LAYERS)
-        config = get_llama_config(str(self.model_path), env_gpu_layers, model_size="2B")
-        
         from llama_cpp import Llama
-        
         self._model = Llama(
             model_path=str(self.model_path),
             n_ctx=n_ctx,           # 8192 tokens
@@ -315,24 +332,17 @@ class LLMService:
             n_gpu_layers=config["n_gpu_layers"],  # Auto-calculated
             verbose=False,
         )
-        self._initialized = True
 ```
 
-### Study Plan Generation
+## Slide 9: Key Code Snippets - Study Plan Generation
 ```python
-    async def generate_study_plan(
-        self,
-        transcript: dict,
-        video_title: str,
-        video_duration: float,
-    ) -> tuple[dict[str, Any], dict[str, float]]:
-        """Generate a study plan from transcript using LLM."""
-        
-        transcript_text = self._format_transcript_for_prompt(transcript)
-        
+    SYSTEM_PROMPT = """You are an expert English language teacher. Your role is to analyze video transcripts and create personalized study plans for English learners.
+
+    """Generate a study plan from transcript using LLM."""
+    async def generate_study_plan(...) -> tuple[dict[str, Any], dict[str, float]]:
         user_prompt = f"""Based on the following video transcript...
         Transcript (first 4000 chars): {transcript_text[:4000]}
-        
+
         Generate a study plan with vocabulary, grammar, and chunk summaries.
         IMPORTANT: All Chinese translations in TRADITIONAL Chinese (繁體中文) ONLY.
         """
@@ -341,18 +351,15 @@ class LLMService:
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_prompt},
         ]
-        
         response = await self._generate_response(messages)
-        return self._parse_json_response(response)
 ```
 
 **Speaker Notes**: 說明我們如何使用 llama-cpp-python 的 GPU 自動檢測功能，以及 Lazy loading 模式如何節省資源。
 
 ---
 
-## Slide 8: Problems Encountered & Solutions (問題與解決方案)
-
-### Problem 1: CUDA Support & Python Version (CUDA 支援與 Python 版本)
+## Slide 10: Problems Encountered & Solutions (問題與解決方案)
+### 1: CUDA Support & Python Version (CUDA 支援與 Python 版本)
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
@@ -372,6 +379,7 @@ class LLMService:
 └────────────────────────────────────────────────────────────────┘
 ```
 
+## Slide 11: Problems Encountered & Solutions (問題與解決方案)
 ### Problem 2: Audio Recording from Browser (瀏覽器音頻錄製)
 
 ```
@@ -405,6 +413,7 @@ class LLMService:
 └────────────────────────────────────────────────────────────────┘
 ```
 
+## Slide 12: Problems Encountered & Solutions (問題與解決方案)
 ### Problem 3: Traditional Chinese Support (繁體中文支援)
 
 ```
@@ -429,14 +438,14 @@ class LLMService:
 
 ---
 
-## Slide 9: Future Enhancements (未來改進)
+## Slide 13: Future Enhancements (未來改進)
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
 │                    FUTURE ENHANCEMENTS                          │
 ├────────────────────────────────────────────────────────────────┤
 │                                                                │
-│  □ Model upgrades (larger LLM for better study plans)          │
+│  □ Model upgrades (larger LLM for better inference quality)    │
 │  □ Multi-language support beyond Chinese/English               │
 │  □ Improved pronunciation feedback with advanced ASR           │
 │  □ Docker Compose for easy deployment                         │
@@ -447,7 +456,7 @@ class LLMService:
 
 ---
 
-## Slide 10: Q&A (問答時間)
+## Slide 14: Q&A (問答時間)
 
 ```
 ╔═══════════════════════════════════════════════════════════════╗
@@ -460,7 +469,7 @@ class LLMService:
 
 ---
 
-## Slide 11: Thank You (感謝聆聽)
+## Slide 15: Thank You (感謝聆聽)
 
 ```
 ╔═══════════════════════════════════════════════════════════════╗
