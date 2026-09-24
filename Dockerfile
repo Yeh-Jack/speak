@@ -1,0 +1,112 @@
+# Ubuntu 24.04 provides Python 3.12 which is required for llama-cpp-python >= 0.1.80.
+# The base image also includes CUDA 12.8 which is required for native Blackwell compilation.
+# Use 'devel' variant to get the CUDA compiler and libraries for building llama-cpp-python with CUDA support.
+FROM nvidia/cuda:12.8.1-devel-ubuntu24.04
+
+# ---------------------------------------------------------------------------
+# Default configurations for this application
+# ---------------------------------------------------------------------------
+ARG APP_DIR=/app
+ARG BACKEND=backend
+ARG FRONTEND=frontend
+ARG BACK_DIR=${APP_DIR}/${BACKEND}
+ARG FRONT_DIR=${APP_DIR}/${FRONTEND}
+ARG DATA_DIR=${APP_DIR}/data
+ARG EXPOSE_PORT=8080
+ENV PROJECT_ROOT=${APP_DIR}
+
+# ---------------------------------------------------------------------------
+# Environment
+# ---------------------------------------------------------------------------
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    CUDA_HOME=/usr/local/cuda \
+    PATH="/opt/venv/bin:${PATH}"
+
+# ---------------------------------------------------------------------------
+# Install uv
+# ---------------------------------------------------------------------------
+COPY --from=ghcr.io/astral-sh/uv:0.12.17 /uv /uvx /usr/local/bin/
+
+# ---------------------------------------------------------------------------
+# System packages
+# ---------------------------------------------------------------------------
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        python3.12 \
+        python3.12-dev \
+        python3.12-venv \
+        build-essential \
+        cmake \
+        ninja-build \
+        ca-certificates \
+        curl \
+        git \
+        ffmpeg && \
+    rm -rf /var/lib/apt/lists/* && \
+    # Create an isolat ed Python 3.12 environment.
+    uv venv --python python3.12 /opt/venv && \
+    # Create data directories for audio, SQLite, models, subtitles, transcripts and videos.
+    mkdir -p ${DATA_DIR}/{audio,db,models,subtitles,transcripts,videos} && \
+    # Create application directories for backend and frontend.
+    mkdir -p ${BACK_DIR} ${FRONT_DIR}
+
+# ---------------------------------------------------------------------------
+# Build llama-cpp-python with CUDA
+#
+# Tesla P100 = SM 60
+# RTX5090 = SM 120
+# ---------------------------------------------------------------------------
+ENV CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=60;120" \
+    FORCE_CMAKE=1
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --python /opt/venv \
+        --upgrade \
+        --no-cache-dir \
+        llama-cpp-python
+
+# ---------------------------------------------------------------------------
+# yt-dlp
+# ---------------------------------------------------------------------------
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --python /opt/venv \
+        --upgrade \
+        "yt-dlp[default]"
+
+# ---------------------------------------------------------------------------
+# Verification
+# ---------------------------------------------------------------------------
+RUN python --version && \
+    uv --version && \
+    ffmpeg -version | head -n 1 && \
+    yt-dlp --version && \
+    python -c "import importlib.metadata; print('llama-cpp-python:', importlib.metadata.version('llama-cpp-python'))"
+
+# ---------------------------------------------------------------------------
+# Install application dependencies and copy application code
+# ---------------------------------------------------------------------------
+WORKDIR ${BACK_DIR}
+
+# Copy dependency files
+COPY ${BACKEND}/pyproject.toml ${BACKEND}/uv.lock ${BACKEND}/README.md ./
+
+# Install dependencies using uv
+RUN uv sync
+
+# Copy application code
+#COPY app/ ./app/
+#COPY alembic/ ./alembic/
+#COPY scripts/ ./scripts/
+# COPY alembic.ini ./
+COPY ${BACKEND}/app ${BACKEND}/alembic ${BACKEND}/scripts ./
+COPY ${BACKEND}/.env.example ${DATA_DIR}/env.example
+COPY ${FRONTEND}/dist ${FRONT_DIR}
+
+# Expose port
+EXPOSE ${EXPOSE_PORT}
+
+# Default command
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "${EXPOSE_PORT}"]
