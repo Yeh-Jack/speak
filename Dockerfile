@@ -12,7 +12,6 @@ ARG FRONTEND=frontend
 ARG BACK_DIR=${APP_DIR}/${BACKEND}
 ARG FRONT_DIR=${APP_DIR}/${FRONTEND}
 ARG DATA_DIR=${APP_DIR}/data
-ARG EXPOSE_PORT=8080
 ENV PROJECT_ROOT=${APP_DIR}
 
 # ---------------------------------------------------------------------------
@@ -50,7 +49,12 @@ RUN apt-get update && \
     # Create an isolat ed Python 3.12 environment.
     uv venv --python python3.12 /opt/venv && \
     # Create data directories for audio, SQLite, models, subtitles, transcripts and videos.
-    mkdir -p ${DATA_DIR}/{audio,db,models,subtitles,transcripts,videos} && \
+    mkdir -p ${DATA_DIR}/audio && \
+    mkdir -p ${DATA_DIR}/db && \
+    mkdir -p ${DATA_DIR}/models && \
+    mkdir -p ${DATA_DIR}/subtitles && \
+    mkdir -p ${DATA_DIR}/transcripts && \
+    mkdir -p ${DATA_DIR}/videos && \
     # Create application directories for backend and frontend.
     mkdir -p ${BACK_DIR} ${FRONT_DIR}
 
@@ -101,12 +105,14 @@ RUN uv sync
 #COPY alembic/ ./alembic/
 #COPY scripts/ ./scripts/
 # COPY alembic.ini ./
-COPY ${BACKEND}/app ${BACKEND}/alembic ${BACKEND}/scripts ./
+COPY ${BACKEND}/app ${BACK_DIR}/app
+COPY ${BACKEND}/alembic ${BACK_DIR}/alembic
+COPY ${BACKEND}/scripts ${BACK_DIR}/scripts
 COPY ${BACKEND}/.env.example ${DATA_DIR}/env.example
-COPY ${FRONTEND}/dist ${FRONT_DIR}
+COPY ${FRONTEND}/dist ${FRONT_DIR}/dist
 
 # Expose port
-EXPOSE ${EXPOSE_PORT}
+EXPOSE 8080
 
 # Default command
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "${EXPOSE_PORT}"]
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
