@@ -22,7 +22,7 @@ dependencies = [
     # FastAPI and web framework
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.27.0",
-    "pydantic>=2.5.0",
+    "pydantic>=2.13.3",
     "pydantic-settings>=2.1.0",
     "python-multipart>=0.0.6",
     # Database - SQLite with async support
@@ -31,13 +31,13 @@ dependencies = [
     "alembic>=1.13.0",
     # LLM - llama-cpp-python with GPU support
     # NVIDIA (CUDA): uv pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu125
-    "llama-cpp-python>=0.3.28",
+    "llama-cpp-python>=0.3.35,<0.4",
     # GPU detection - NVIDIA and AMD support
     "gputil>=1.4.0",
     "pyamdgpuinfo>=2.1.6; sys_platform == 'linux'",
     # Video processing
     "ffmpeg-python>=0.2.0",
-    "yt-dlp>=2024.1.0",
+    "yt-dlp[default]>=2024.1.0",
     # Transcription
     "faster-whisper>=0.10.0",
     "ctranslate2>=4.0.0",
@@ -50,7 +50,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "tenacity>=8.2.0",
     "orjson>=3.9.0",
-    "playwright>=1.60.0",
+    "playwright>=1.63.0",
 ]
 
 [project.optional-dependencies]
