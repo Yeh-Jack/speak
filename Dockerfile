@@ -1,3 +1,5 @@
+# This Dockerfile builds a Docker image for the Speak application in one stage which resulting in a 37.8GB image.
+#
 # Ubuntu 24.04 provides Python 3.12 which is required for llama-cpp-python >= 0.1.80.
 # The base image also includes CUDA 12.8 which is required for native Blackwell compilation.
 # Use 'devel' variant to get the CUDA compiler and libraries for building llama-cpp-python with CUDA support.
@@ -101,9 +103,6 @@ COPY ${BACKEND}/pyproject.toml ${BACKEND}/uv.lock ${BACKEND}/README.md ./
 RUN uv sync
 
 # Copy application code
-#COPY app/ ./app/
-#COPY alembic/ ./alembic/
-#COPY scripts/ ./scripts/
 # COPY alembic.ini ./
 COPY ${BACKEND}/app ${BACK_DIR}/app
 COPY ${BACKEND}/alembic ${BACK_DIR}/alembic
