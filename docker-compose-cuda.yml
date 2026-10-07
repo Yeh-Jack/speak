@@ -1,0 +1,31 @@
+services:
+  speak:
+    image: speak:cuda-12.8.1
+    container_name: speak
+    hostname: speak
+    restart: unless-stopped
+    environment:
+      - DEFAULT_MODEL=Qwen3.5-2B-Q4_K_M.gguf
+      - LLM_GPU_LAYERS=${LLM_GPU_LAYERS:--1}
+      - LLM_CONTEXT_SIZE=8192
+      - YOUTUBE_DOWNLOAD_QUALITY=720
+      - YOUTUBE_AUDIO_QUALITY=128k
+      - CHUNK_DURATION=30
+    # Add `uv run alembic upgrade head &&` before starting the server to run
+    # database migrations on container start (a `alembic.ini` file should be present).
+    command: >
+      bash -c "mkdir -p /app/data/{audios,db,models,subtitles,transcripts,videos} &&
+      chown -R 1000:1000 /app/data &&
+      uv run uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["0"]
+              capabilities: [gpu]
+    ports:
+      - "8080:8080"
+    volumes:
+      # Store 'Qwen3.5-2B-Q4_K_M.gguf' into `/docker/volume/speak/models/`.
+      - /docker/volume/speak:/app/data
