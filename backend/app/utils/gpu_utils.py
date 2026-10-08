@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
-from app.core.logging import get_logger
+from app.core.logging import get_logger, is_verbose
 
 logger = get_logger(__name__)
 
@@ -209,7 +209,7 @@ class GPUManager:
         config = {
             "model_path": model_path,
             "n_ctx": 4096,
-            "verbose": False,
+            "verbose": is_verbose(),
         }
 
         # Parse environment variable

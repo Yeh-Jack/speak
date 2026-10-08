@@ -13,10 +13,12 @@ services:
       - CHUNK_DURATION=30
     # Add `uv run alembic upgrade head &&` before starting the server to run
     # database migrations on container start (a `alembic.ini` file should be present).
+    # Use the venv binary directly: `uv run` would try to install dev
+    # dependencies at runtime (venv is built --no-dev) and fail without network.
     command: >
       bash -c "mkdir -p /app/data/{audios,db,models,subtitles,transcripts,videos} &&
       chown -R 1000:1000 /app/data &&
-      uv run uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload"
+      /opt/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload"
     deploy:
       resources:
         reservations:

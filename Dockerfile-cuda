@@ -1,6 +1,8 @@
 # This Dockerfile builds a Docker image for the Speak application within two
 # stages which reduces the image size from 37.8GB to 18.4GB.
 #
+# Remove the unused 'pyannote.audio' package, the image size drop to 10.2GB.
+#
 # ---------------------------------------------------------------------------
 # Default configurations for this application
 # ---------------------------------------------------------------------------
@@ -89,7 +91,11 @@ COPY ${BACKEND}/pyproject.toml ${BACKEND}/uv.lock ${BACKEND}/README.md ./
 ENV CMAKE_ARGS="-DGGML_CUDA=ON -DGGML_NATIVE=OFF -DCMAKE_CUDA_ARCHITECTURES=60;120" \
     FORCE_CMAKE=1
 
+# uv caches sdist-built wheels keyed by package+version only, NOT by build
+# env (CMAKE_ARGS). A stale CPU-only build from an earlier build would be
+# reused silently, so clean this package's cache before building.
 RUN --mount=type=cache,target=${UV_TARGET} \
+    uv cache clean llama-cpp-python && \
     uv sync \
         --frozen \
         --no-install-project \
@@ -188,13 +194,18 @@ RUN python3.12 --version && \
 print('llama-cpp-python:', m.version('llama-cpp-python')); \
 print('ctranslate2:', m.version('ctranslate2')); \
 print('faster-whisper:', m.version('faster-whisper')); \
-print('pyannote.audio:', m.version('pyannote.audio')); \
 print('yt-dlp:', m.version('yt-dlp'))" && \
     ffmpeg -version | head -n 1 && \
-    python3.12 -c "import importlib.metadata; print('llama-cpp-python:', importlib.metadata.version('llama-cpp-python'))"
+    python3.12 -c "import importlib.metadata; print('llama-cpp-python:', importlib.metadata.version('llama-cpp-python'))" && \
+    # Filesystem check only: importing llama_cpp loads libllama.so which needs
+    # libcuda.so.1 from the host driver (absent at build time).
+    python3.12 -c "import importlib.util, os; \
+spec = importlib.util.find_spec('llama_cpp'); \
+libs = os.listdir(os.path.join(os.path.dirname(spec.origin), 'lib')); \
+assert any('ggml-cuda' in l for l in libs), f'llama-cpp-python built without CUDA: {libs}'"
 
 # Expose port
 EXPOSE 8080
 
-# Default command
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Default command (venv binary directly: `uv run` would install dev deps at runtime)
+CMD ["/opt/venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

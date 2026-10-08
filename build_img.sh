@@ -9,7 +9,8 @@ pnpm run build
 #uv build
 
 # Build the Docker image.
+DOCKERFILE_PATH="Dockerfile-cuda"
 IMG_NAME="speak"
 IMG_TAG="cuda-12.8.1"
 cd ..
-docker build -t ${IMG_NAME}:${IMG_TAG} .
+docker build -f ${DOCKERFILE_PATH} -t ${IMG_NAME}:${IMG_TAG} .

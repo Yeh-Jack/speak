@@ -90,9 +90,9 @@
     "semantic_hash": ""
   },
   "backend/app/api/v1/endpoints/llm.py": {
-    "mtime": 1791456507.0606475,
-    "seen": 1791457158.782512,
-    "ast_hash": "308a2698e0a356b0581d8c31f701a2fe",
+    "mtime": 1791450023.2698781,
+    "seen": 1791450045.871418,
+    "ast_hash": "5381cd6d7494c9c93e34aacedff44dab",
     "semantic_hash": ""
   },
   "backend/app/api/v1/endpoints/migrate.py": {
@@ -144,9 +144,9 @@
     "semantic_hash": ""
   },
   "backend/app/core/logging.py": {
-    "mtime": 1791456444.9696426,
-    "seen": 1791457158.7825665,
-    "ast_hash": "3070933eaca43b89b36ff8cee1628c82",
+    "mtime": 1791455666.31063,
+    "seen": 1791455777.4926999,
+    "ast_hash": "ff483bc7174b8d5a1ace118b24efe7a6",
     "semantic_hash": ""
   },
   "backend/app/db/__init__.py": {
@@ -162,15 +162,15 @@
     "semantic_hash": ""
   },
   "backend/app/db/session.py": {
-    "mtime": 1791456415.3118253,
-    "seen": 1791457158.782579,
-    "ast_hash": "23fa2c7ac4b9ad6192da39257afeeb95",
+    "mtime": 1791452654.6330142,
+    "seen": 1791453250.5069182,
+    "ast_hash": "97db640d2b0755ce7a1b1ce3c9342a12",
     "semantic_hash": ""
   },
   "backend/app/main.py": {
-    "mtime": 1791456053.9081426,
-    "seen": 1791457158.7825828,
-    "ast_hash": "b81864cf0b74c6ed4bbb42266fc99831",
+    "mtime": 1791452698.169734,
+    "seen": 1791453250.506924,
+    "ast_hash": "ed5f065a74ac4e781bae2e16dc687b43",
     "semantic_hash": ""
   },
   "backend/app/models/__init__.py": {
@@ -330,15 +330,15 @@
     "semantic_hash": ""
   },
   "backend/app/services/chunking_service.py": {
-    "mtime": 1791456260.2728195,
-    "seen": 1791457158.7826817,
-    "ast_hash": "6ed5b5075e51d856e0b7f032aea8d147",
+    "mtime": 1791452658.9389865,
+    "seen": 1791453250.507045,
+    "ast_hash": "633215cf3ca49db04e69c51ab15cc855",
     "semantic_hash": ""
   },
   "backend/app/services/download_service.py": {
-    "mtime": 1791456316.1334612,
-    "seen": 1791457158.7826855,
-    "ast_hash": "91cd6f80266702e0f1b91e5990b325e6",
+    "mtime": 1791452843.630798,
+    "seen": 1791453250.5070493,
+    "ast_hash": "3b6c93e8254321d6e77908f55c920d55",
     "semantic_hash": ""
   },
   "backend/app/services/exceptions.py": {
@@ -348,9 +348,9 @@
     "semantic_hash": ""
   },
   "backend/app/services/llm_service.py": {
-    "mtime": 1791456264.2217941,
-    "seen": 1791457158.7826927,
-    "ast_hash": "b312e1698dc24ae2d3f55b0fb5759226",
+    "mtime": 1791452791.5611331,
+    "seen": 1791453250.5070572,
+    "ast_hash": "d499c67708760369d80512879a5e3318",
     "semantic_hash": ""
   },
   "backend/app/services/speaking_service.py": {
@@ -366,15 +366,15 @@
     "semantic_hash": ""
   },
   "backend/app/services/transcription_service.py": {
-    "mtime": 1791456274.2587297,
-    "seen": 1791457158.7827036,
-    "ast_hash": "14611765b326d8a1e1f068a4ef9d3a6f",
+    "mtime": 1791452664.0319538,
+    "seen": 1791453250.5070686,
+    "ast_hash": "353e9c477de4410bf81aebd8aa6965ba",
     "semantic_hash": ""
   },
   "backend/app/services/video_service.py": {
-    "mtime": 1791456299.4295683,
-    "seen": 1791457158.782707,
-    "ast_hash": "ede247e53f17d8cc36325b591bb68f03",
+    "mtime": 1791452773.4312499,
+    "seen": 1791453250.507072,
+    "ast_hash": "e1bf3f2c0e081963cad69510ed366681",
     "semantic_hash": ""
   },
   "backend/app/utils/__init__.py": {
@@ -384,9 +384,9 @@
     "semantic_hash": ""
   },
   "backend/app/utils/gpu_utils.py": {
-    "mtime": 1791456026.6474483,
-    "seen": 1791457158.7827635,
-    "ast_hash": "e86092f0c5780c6a0a8b343dbc299a6a",
+    "mtime": 1791455718.695293,
+    "seen": 1791455777.492895,
+    "ast_hash": "5400ed8ab200418a23a67cbc457d6c05",
     "semantic_hash": ""
   },
   "backend/pyproject.toml": {
@@ -528,9 +528,9 @@
     "semantic_hash": ""
   },
   "frontend/src/components/learning/ShadowingMode.vue": {
-    "mtime": 1791456547.1939797,
-    "seen": 1791457158.7828662,
-    "ast_hash": "1f1c7282347932622d74704451095f6c",
+    "mtime": 1791452640.2188175,
+    "seen": 1791453250.507182,
+    "ast_hash": "cb3d2e6a9b44b38e453382069ac6c95b",
     "semantic_hash": ""
   },
   "frontend/src/components/learning/StudyPlanDisplay.vue": {
@@ -678,9 +678,9 @@
     "semantic_hash": ""
   },
   "frontend/src/views/VideoPlayerView.vue": {
-    "mtime": 1791456575.8887959,
-    "seen": 1791457158.7829678,
-    "ast_hash": "711ab97d04729997f3245f1a777a0ce1",
+    "mtime": 1791452622.2062228,
+    "seen": 1791453250.5072978,
+    "ast_hash": "39d6217fee46dcc88d1e1054a1932796",
     "semantic_hash": ""
   },
   "frontend/tailwind.config.js": {
@@ -822,9 +822,9 @@
     "semantic_hash": ""
   },
   "docker-compose.yml": {
-    "mtime": 1791457065.9084961,
-    "seen": 1791457158.7830672,
-    "ast_hash": "d561d3c234aebc873ffb1663af74e4de",
+    "mtime": 1791439024.9035032,
+    "seen": 1791450045.8721058,
+    "ast_hash": "cf125d5cf8d55f99f1ec19f82ebb3086",
     "semantic_hash": ""
   },
   "docs/superpowers/plans/2025-04-24-sqlite3-migration.md": {
