@@ -1,9 +1,7 @@
-# This Dockerfile builds a CPU-only Docker image for the Speak application
-# within two stages.
+# This Dockerfile builds a Docker image for the Speak application within two
+# stages which reduces the image size from 37.8GB to 18.4GB.
 #
-# The GPU variant lives in `Dockerfile-cuda`. Use that one when LLM inference
-# should offload to an NVIDIA GPU; this image compiles llama-cpp-python without
-# CUDA and carries no CUDA/cuDNN runtime, which keeps it much smaller.
+# Remove the unused 'pyannote.audio' package, the image size drop to 10.2GB.
 #
 # ---------------------------------------------------------------------------
 # Default configurations for this application
@@ -21,9 +19,10 @@ ARG UV_TARGET=/root/.cache/uv
 # Builder
 #
 # Ubuntu 24.04 provides Python 3.12 which is required for llama-cpp-python >= 0.1.80.
-# Plain Ubuntu, no CUDA toolkit: llama-cpp-python builds its CPU backend here.
+# The base image also includes CUDA 12.8 which is required for native Blackwell compilation.
+# Use 'devel' variant to get the CUDA compiler and libraries for building llama-cpp-python with CUDA support.
 # ============================================================
-FROM ubuntu:24.04 AS builder
+FROM nvidia/cuda:12.8.1-devel-ubuntu24.04 AS builder
 
 ARG APP_DIR
 ARG BACKEND
@@ -39,6 +38,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
+    CUDA_HOME=/usr/local/cuda \
     PATH="${UV_PROJECT_ENVIRONMENT}/bin:${PATH}"
 
 # Build dependencies only.
@@ -82,15 +82,20 @@ WORKDIR ${BACK_DIR}
 # ------------------------------------------------------------
 COPY ${BACKEND}/pyproject.toml ${BACKEND}/uv.lock ${BACKEND}/README.md ./
 
-# llama-cpp-python compiles the CPU backend only: GGML_CUDA=OFF leaves out
-# the CUDA backend entirely so the build needs no nvcc.
+# llama-cpp-python is compiled against CUDA 12.8.
 #
-# GGML_NATIVE=OFF keeps the build portable to any host CPU (no AVX/AVX2/NEON
-# baked in). Set it to ON and rebuild on the target machine for peak speed.
-ENV CMAKE_ARGS="-DGGML_CUDA=OFF -DGGML_NATIVE=OFF" \
+# 60  = NVIDIA Pascal / Tesla P100
+# 120 = NVIDIA Blackwell / RTX 5090
+#
+# GGLM_NATIVE=OFF avoids compiling for the build host CPU only.
+ENV CMAKE_ARGS="-DGGML_CUDA=ON -DGGML_NATIVE=OFF -DCMAKE_CUDA_ARCHITECTURES=60;120" \
     FORCE_CMAKE=1
 
+# uv caches sdist-built wheels keyed by package+version only, NOT by build
+# env (CMAKE_ARGS). A stale CPU-only build from an earlier build would be
+# reused silently, so clean this package's cache before building.
 RUN --mount=type=cache,target=${UV_TARGET} \
+    uv cache clean llama-cpp-python && \
     uv sync \
         --frozen \
         --no-install-project \
@@ -128,10 +133,10 @@ FROM denoland/deno:2.9.7 AS deno
 # Runtime
 # ============================================================
 #
-# No CUDA runtime here: everything runs on the CPU.
-# faster-whisper / CTranslate2 fall back to their CPU kernels automatically.
+# Use cuDNN runtime because faster-whisper / CTranslate2 speech
+# workloads can require cuDNN.
 # ============================================================
-FROM ubuntu:24.04 AS runtime
+FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04 AS runtime
 
 ARG APP_DIR
 ARG BACKEND
@@ -146,18 +151,16 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    LLM_GPU_LAYERS=0 \
+    CUDA_HOME=/usr/local/cuda \
     PATH="${UV_PROJECT_ENVIRONMENT}/bin:${PATH}"
 
 # Runtime-only system packages.
 # libssl3t64 is OpenSSL 3.1.2 library which is required by llama-cpp-python >= 0.1.80.
-# libgomp1 is the GCC OpenMP runtime which ggml and CTranslate2 link against.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
         ffmpeg \
-        libgomp1 \
         libssl3t64 \
         python3.12 && \
     rm -rf /var/lib/apt/lists/*
@@ -182,9 +185,9 @@ WORKDIR ${BACK_DIR}
 # ------------------------------------------------------------
 # Basic build-time verification
 #
-# Importing llama_cpp is the real check: it fails loudly when the ggml CPU
-# backend did not link. llama_supports_gpu_offload() proves the CUDA backend
-# was left out of the build.
+# Don't try to initialize CUDA here:
+# libcuda.so.1 comes from the NVIDIA host driver and is normally
+# injected when the container is started with --gpus.
 # ------------------------------------------------------------
 RUN python3.12 --version && \
     python3.12 -c "import importlib.metadata as m; \
@@ -192,13 +195,17 @@ print('llama-cpp-python:', m.version('llama-cpp-python')); \
 print('ctranslate2:', m.version('ctranslate2')); \
 print('faster-whisper:', m.version('faster-whisper')); \
 print('yt-dlp:', m.version('yt-dlp'))" && \
-    python3.12 -c "import llama_cpp; \
-assert not llama_cpp.llama_supports_gpu_offload(), 'CUDA backend unexpectedly present'; \
-print('llama-cpp-python: CPU-only backend confirmed')" && \
-    ffmpeg -version | head -n 1
+    ffmpeg -version | head -n 1 && \
+    python3.12 -c "import importlib.metadata; print('llama-cpp-python:', importlib.metadata.version('llama-cpp-python'))" && \
+    # Filesystem check only: importing llama_cpp loads libllama.so which needs
+    # libcuda.so.1 from the host driver (absent at build time).
+    python3.12 -c "import importlib.util, os; \
+spec = importlib.util.find_spec('llama_cpp'); \
+libs = os.listdir(os.path.join(os.path.dirname(spec.origin), 'lib')); \
+assert any('ggml-cuda' in l for l in libs), f'llama-cpp-python built without CUDA: {libs}'"
 
 # Expose port
 EXPOSE 8080
 
-# Default command
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Default command (venv binary directly: `uv run` would install dev deps at runtime)
+CMD ["/opt/venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

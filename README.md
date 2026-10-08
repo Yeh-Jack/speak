@@ -65,9 +65,43 @@ pnpm dev
 ```
 
 ### Docker
-**Not available yet.**
+**Build docker image for working with CPU only.**
 ```bash
-docker-compose up -d
+# Build the frontend artifact.
+cd frontend
+pnpm run build
+
+# Build the Docker image. This step takes a long time.
+IMG_NAME="speak"
+IMG_TAG="cpu"
+cd ..
+docker build -t ${IMG_NAME}:${IMG_TAG} .
+
+# Modify the compose file if needed to meet your environment.
+vi docker-compose.yml
+
+# Create the container.
+docker compose up -d
+```
+
+**Build docker image with CUDA support.**
+```bash
+# Build the frontend artifact.
+cd frontend
+pnpm run build
+
+# Build the Docker image. This step takes a long time.
+DOCKERFILE_PATH="Dockerfile-cuda"
+IMG_NAME="speak"
+IMG_TAG="cuda-12.8.1"
+cd ..
+docker build -f ${DOCKERFILE_PATH} -t ${IMG_NAME}:${IMG_TAG} .
+
+# Modify the compose file if needed to meet your environment.
+vi docker-compose-cuda.yml
+
+# Create the container.
+docker compose -f docker-compose-cuda.yml up -d
 ```
 
 Access:
